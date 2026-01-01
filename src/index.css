@@ -1,0 +1,145 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Utsavam 6.0 - Festive Design System */
+
+@layer base {
+  :root {
+    --background: 20 10% 8%;
+    --foreground: 45 100% 96%;
+
+    --card: 20 15% 12%;
+    --card-foreground: 45 100% 96%;
+
+    --popover: 20 15% 10%;
+    --popover-foreground: 45 100% 96%;
+
+    --primary: 38 100% 50%;
+    --primary-foreground: 20 10% 8%;
+
+    --secondary: 340 80% 55%;
+    --secondary-foreground: 45 100% 96%;
+
+    --muted: 20 10% 25%;
+    --muted-foreground: 45 30% 70%;
+
+    --accent: 280 70% 60%;
+    --accent-foreground: 45 100% 96%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 85% 97%;
+
+    --border: 38 30% 25%;
+    --input: 20 15% 20%;
+    --ring: 38 100% 50%;
+
+    --radius: 0.75rem;
+
+    /* Festive color palette */
+    --gold: 38 100% 50%;
+    --gold-glow: 38 100% 65%;
+    --orange: 25 100% 55%;
+    --magenta: 340 80% 55%;
+    --deep-purple: 280 70% 40%;
+    --warm-red: 10 85% 55%;
+    --soft-green: 140 50% 45%;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(20 10% 5% / 0.9), hsl(280 70% 10% / 0.8), hsl(20 10% 5% / 0.9));
+    --gradient-gold: linear-gradient(135deg, hsl(38 100% 50%), hsl(25 100% 55%));
+    --gradient-festive: linear-gradient(135deg, hsl(38 100% 50%), hsl(340 80% 55%), hsl(280 70% 60%));
+
+    /* Shadows */
+    --shadow-glow: 0 0 40px hsl(38 100% 50% / 0.3);
+    --shadow-festive: 0 0 60px hsl(38 100% 50% / 0.2), 0 0 100px hsl(340 80% 55% / 0.1);
+
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Poppins', sans-serif;
+  }
+
+  .dark {
+    --background: 20 10% 5%;
+    --foreground: 45 100% 96%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-body {
+    font-family: var(--font-body);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px hsl(var(--gold) / 0.5), 0 0 40px hsl(var(--gold) / 0.3);
+  }
+
+  .text-glow-strong {
+    text-shadow: 0 0 30px hsl(var(--gold) / 0.7), 0 0 60px hsl(var(--gold) / 0.4), 0 0 80px hsl(var(--orange) / 0.3);
+  }
+
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .bg-gradient-festive {
+    background: var(--gradient-festive);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 3s linear infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.9; filter: brightness(1.2); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes countdown-flip {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-countdown-flip {
+  animation: countdown-flip 0.3s ease-out;
+}
