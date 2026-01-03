@@ -6,15 +6,13 @@ import { cn } from '@/lib/utils';
 export const WORDS_TO_FIND = [
   'UTSAVAM',
   'TALENT',
-  'CULTURE',
-  'EXPRESS',
-  'TEAM',
   'STAGE',
+  'TEAM',
   'VOICE'
 ];
 
 // Grid size (adjust if needed for more/longer words)
-const GRID_SIZE = 12;
+const GRID_SIZE = 8;
 
 type Direction = [number, number];
 type Position = { row: number; col: number };
