@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { House, HOUSES } from './MagicalSorterGame';
-import { Sparkles, ArrowRight, Crown } from 'lucide-react';
+import { Sparkles, Crown, Home, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HouseRevealProps {
   house: House;
   scores: Record<House, number>;
-  onProceed: () => void;
+  onBackToMiniGames: () => void;
+  onBackToHome: () => void;
 }
 
-const HouseReveal = ({ house, scores, onProceed }: HouseRevealProps) => {
+const HouseReveal = ({ house, scores, onBackToMiniGames, onBackToHome }: HouseRevealProps) => {
   const [phase, setPhase] = useState<'building' | 'revealing' | 'revealed'>('building');
   const [canProceed, setCanProceed] = useState(false);
 
@@ -148,20 +149,33 @@ const HouseReveal = ({ house, scores, onProceed }: HouseRevealProps) => {
               ))}
             </div>
 
-            {/* Proceed button */}
-            <Button
-              variant="hero"
-              size="xl"
-              onClick={onProceed}
-              disabled={!canProceed}
-              className={cn(
-                "group transition-all duration-500",
-                canProceed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              )}
-            >
-              <span>Register to Your House</span>
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </Button>
+            {/* Action buttons */}
+            <div className={cn(
+              "flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500",
+              canProceed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            )}>
+              <Button
+                variant="hero"
+                size="lg"
+                onClick={onBackToMiniGames}
+                disabled={!canProceed}
+                className="group"
+              >
+                <Gamepad2 className="w-4 h-4 mr-2" />
+                <span>Back to Mini Games</span>
+              </Button>
+              
+              <Button
+                variant="heroOutline"
+                size="lg"
+                onClick={onBackToHome}
+                disabled={!canProceed}
+                className="group"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                <span>Back to Home</span>
+              </Button>
+            </div>
           </div>
         )}
       </div>

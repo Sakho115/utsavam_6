@@ -31,8 +31,12 @@ const MagicalSorter = () => {
     setPhase('reveal');
   };
 
-  const handleProceedToRegistration = () => {
-    navigate('/registration', { state: { house: assignedHouse, scores } });
+  const handleBackToMiniGames = () => {
+    navigate('/extras');
+  };
+
+  const handleBackToHome = () => {
+    navigate('/');
   };
 
   // Show house reveal
@@ -41,7 +45,8 @@ const MagicalSorter = () => {
       <HouseReveal 
         house={assignedHouse} 
         scores={scores}
-        onProceed={handleProceedToRegistration}
+        onBackToMiniGames={handleBackToMiniGames}
+        onBackToHome={handleBackToHome}
       />
     );
   }

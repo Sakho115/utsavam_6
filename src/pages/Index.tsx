@@ -101,22 +101,22 @@ const Index = () => {
             <CountdownTimer />
           </div>
 
-          {/* CTA Button */}
+          {/* CTA Buttons */}
           <div 
             className={`flex flex-col sm:flex-row gap-4 justify-center transition-all duration-1000 pointer-events-auto ${
               isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             }`}
             style={{ transitionDelay: '1200ms' }}
           >
-            <Link to="/word-search">
+            <Link to="/register">
               <Button variant="hero" size="xl" className="group">
-                <span>Enter the fest</span>
+                <span>Register Now</span>
                 <Sparkles className="w-5 h-5 transition-transform group-hover:rotate-12" />
               </Button>
             </Link>
-            <Link to="/learn-more">
+            <Link to="/events">
               <Button variant="heroOutline" size="xl">
-                Learn more
+                Explore Events
               </Button>
             </Link>
           </div>

@@ -2,14 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import WordSearchGrid, { WORDS_TO_FIND } from '@/components/WordSearchGrid';
-import TransitionScreen from '@/components/TransitionScreen';
-import { Sparkles, CheckCircle, Search, ArrowRight } from 'lucide-react';
+import { Sparkles, CheckCircle, Search, Home, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const WordSearchGame = () => {
   const [foundWords, setFoundWords] = useState<string[]>([]);
   const [isComplete, setIsComplete] = useState(false);
-  const [showTransition, setShowTransition] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [recentlyFound, setRecentlyFound] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -33,14 +31,6 @@ const WordSearchGame = () => {
     }
   };
 
-  const handleProceed = () => {
-    // Show transition screen first
-    setShowTransition(true);
-  };
-
-  const handleTransitionComplete = () => {
-    navigate('/magical-sorter');
-  };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -149,42 +139,44 @@ const WordSearchGame = () => {
         </div>
 
         {/* Completion Overlay */}
-        {isComplete && !showTransition && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md animate-fade-in">
+        {isComplete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in">
             <div className="text-center p-8 max-w-md mx-4 animate-scale-in">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/20 mb-6 animate-pulse-glow">
                 <Sparkles className="w-10 h-10 text-primary" />
               </div>
               
               <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground text-glow mb-4">
-                Level 1 Complete!
+                Puzzle Complete!
               </h2>
               
               <p className="text-muted-foreground mb-8">
-                You've unlocked the next stage of Utsavam 6.0
+                You found all the hidden words! Great job!
               </p>
               
-              <Button 
-                variant="hero" 
-                size="xl" 
-                onClick={handleProceed}
-                className="group"
-              >
-                <span>Continue</span>
-                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  variant="hero" 
+                  size="lg" 
+                  onClick={() => navigate('/extras')}
+                  className="group"
+                >
+                  <Gamepad2 className="w-4 h-4 mr-2" />
+                  <span>Back to Mini Games</span>
+                </Button>
+                
+                <Button 
+                  variant="heroOutline" 
+                  size="lg" 
+                  onClick={() => navigate('/')}
+                  className="group"
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  <span>Back to Home</span>
+                </Button>
+              </div>
             </div>
           </div>
-        )}
-
-        {/* Transition Screen */}
-        {showTransition && (
-          <TransitionScreen
-            title="Congratulations on completing Level 1"
-            subtitle="Preparing for House Selection Round..."
-            onComplete={handleTransitionComplete}
-            duration={3000}
-          />
         )}
 
         {/* Instructions hint */}
