@@ -7,7 +7,6 @@ import Index from "./pages/Index";
 import LearnMore from "./pages/LearnMore";
 import WordSearchGame from "./pages/WordSearchGame";
 import MagicalSorter from "./pages/MagicalSorter";
-import Registration from "./pages/Registration";
 import Register from "./pages/Register";
 import RegistrationSuccess from "./pages/RegistrationSuccess";
 import Events from "./pages/Events";
@@ -37,7 +36,6 @@ const App = () => (
           <Route path="/synonym-challenge" element={<SynonymChallenge />} />
           <Route path="/sentence-fixer" element={<SentenceFixer />} />
           <Route path="/guess-the-word" element={<GuessTheWord />} />
-          <Route path="/registration" element={<Registration />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

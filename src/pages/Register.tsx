@@ -9,6 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Sparkles, CheckCircle2, User, Users, AlertCircle } from 'lucide-react';
 import heroBg from '@/assets/hero-bg.jpg';
 
+const GOOGLE_SHEET_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbws31vRhbeydLFZxFk8MjAH1yO0BCXM3Yinc3i7R0wpFYyC4bBzC8fFVwBnUcCZPotrbg/exec";
+
+
 interface FormData {
   fullName: string;
   college: string;
@@ -100,38 +103,64 @@ const Register = () => {
     }
     return true;
   };
-
+// ----------------------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
+  e.preventDefault();
 
-    setIsSubmitting(true);
+  if (!validateForm()) return;
 
-    const registration: Registration = {
-      id: generateId(),
-      ...formData,
-      morningEvent: morningEvents.find(e => e.id === formData.morningEvent)?.name || formData.morningEvent,
-      afternoonEvent: afternoonEvents.find(e => e.id === formData.afternoonEvent)?.name || formData.afternoonEvent,
-      registeredAt: new Date().toISOString()
-    };
+  setIsSubmitting(true);
 
-    // Store in localStorage (append to existing registrations)
-    try {
-      const existingData = localStorage.getItem('utsavam_registrations');
-      const registrations = existingData ? JSON.parse(existingData) : { registrations: [] };
-      registrations.registrations.push(registration);
-      localStorage.setItem('utsavam_registrations', JSON.stringify(registrations));
-
-      // Navigate to success page with registration data
-      setTimeout(() => {
-        navigate('/registration-success', { state: { registration } });
-      }, 500);
-    } catch (error) {
-      toast({ title: 'Registration failed. Please try again.', variant: 'destructive' });
-      setIsSubmitting(false);
-    }
+  const registration: Registration = {
+    id: generateId(),
+    ...formData,
+    morningEvent:
+      morningEvents.find(e => e.id === formData.morningEvent)?.name ||
+      formData.morningEvent,
+    afternoonEvent:
+      afternoonEvents.find(e => e.id === formData.afternoonEvent)?.name ||
+      formData.afternoonEvent,
+    registeredAt: new Date().toISOString()
   };
+
+  try {
+    // ✅ SEND TO GOOGLE SHEETS (CORS-SAFE)
+    await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+      method: "POST",
+      mode: "no-cors",
+      body: JSON.stringify(registration)
+    });
+
+    // ✅ LOCAL BACKUP
+    const existingData = localStorage.getItem("utsavam_registrations");
+    const registrations = existingData
+      ? JSON.parse(existingData)
+      : { registrations: [] };
+
+    registrations.registrations.push(registration);
+    localStorage.setItem(
+      "utsavam_registrations",
+      JSON.stringify(registrations)
+    );
+
+    // ✅ SUCCESS FLOW
+    setTimeout(() => {
+      navigate("/registration-success", {
+        state: { registration }
+      });
+    }, 500);
+
+  } catch (error) {
+    console.error(error);
+    toast({
+      title: "Registration failed",
+      description: "Please try again later.",
+      variant: "destructive"
+    });
+    setIsSubmitting(false);
+  }
+};
+
 
   const showEventValidationMessage = !formData.morningEvent || !formData.afternoonEvent;
 
