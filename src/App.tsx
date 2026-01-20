@@ -11,6 +11,7 @@ import Register from "./pages/Register";
 import RegistrationSuccess from "./pages/RegistrationSuccess";
 import Events from "./pages/Events";
 import Extras from "./pages/Extras";
+import TeamManagement from "./pages/TeamManagement";
 import SynonymChallenge from "./components/games/SynonymChallenge";
 import SentenceFixer from "./components/games/SentenceFixer";
 import GuessTheWord from "./components/games/GuessTheWord";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/registration-success" element={<RegistrationSuccess />} />
           <Route path="/extras" element={<Extras />} />
+          <Route path="/team-management" element={<TeamManagement />} />
           <Route path="/word-search" element={<WordSearchGame />} />
           <Route path="/magical-sorter" element={<MagicalSorter />} />
           <Route path="/synonym-challenge" element={<SynonymChallenge />} />

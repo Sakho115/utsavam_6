@@ -9,7 +9,7 @@ import heroBg from '@/assets/hero-bg.jpg';
 
 interface Event {
   name: string;
-  type: 'Solo' | 'Group';
+  type: 'Solo' | 'Pair' | 'Group';
   timeSlot: 'Morning' | 'Afternoon';
   howItWorks: string[];
   skillsTested: string[];
@@ -18,7 +18,7 @@ interface Event {
 
 const morningEvents: Event[] = [
   {
-    name: 'Commentary Clash',
+    name: 'Trispark',
     type: 'Solo',
     timeSlot: 'Morning',
     howItWorks: [
@@ -31,8 +31,8 @@ const morningEvents: Event[] = [
     duration: '5-7 minutes per participant'
   },
   {
-    name: 'Word Wizard',
-    type: 'Solo',
+    name: 'Scramble zone',
+    type: 'Pair',
     timeSlot: 'Morning',
     howItWorks: [
       'Receive a random word or phrase prompt',
@@ -44,8 +44,8 @@ const morningEvents: Event[] = [
     duration: '4-6 minutes per participant'
   },
   {
-    name: 'Debate Duel',
-    type: 'Solo',
+    name: 'Frames to Fame',
+    type: 'Group',
     timeSlot: 'Morning',
     howItWorks: [
       'Draw a topic from the mystery box',
@@ -60,7 +60,7 @@ const morningEvents: Event[] = [
 
 const afternoonEvents: Event[] = [
   {
-    name: 'Skit Spectacular',
+    name: 'Wordora',
     type: 'Group',
     timeSlot: 'Afternoon',
     howItWorks: [
@@ -73,7 +73,7 @@ const afternoonEvents: Event[] = [
     duration: '10-15 minutes per team'
   },
   {
-    name: 'Quiz Quest',
+    name: 'The Static chase',
     type: 'Group',
     timeSlot: 'Afternoon',
     howItWorks: [

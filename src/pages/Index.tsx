@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import FireworkCanvas from '@/components/FireworkCanvas';
 import CountdownTimer from '@/components/CountdownTimer';
 import heroBg from '@/assets/hero-bg.jpg';
-import { Sparkles, Calendar, MapPin } from 'lucide-react';
+import { Sparkles, Calendar, MapPin, Users } from 'lucide-react';
 
 const Index = () => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -83,7 +83,7 @@ const Index = () => {
           >
             <div className="flex items-center gap-2 text-foreground/80">
               <Calendar className="w-5 h-5 text-primary" />
-              <span className="text-sm md:text-base">February 2026</span>
+              <span className="text-sm md:text-base">25th February 2026</span>
             </div>
             <div className="flex items-center gap-2 text-foreground/80">
               <MapPin className="w-5 h-5 text-secondary" />
@@ -103,7 +103,7 @@ const Index = () => {
 
           {/* CTA Buttons */}
           <div 
-            className={`flex flex-col sm:flex-row gap-4 justify-center transition-all duration-1000 pointer-events-auto ${
+            className={`flex flex-col sm:flex-row gap-4 justify-center flex-wrap transition-all duration-1000 pointer-events-auto ${
               isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             }`}
             style={{ transitionDelay: '1200ms' }}
@@ -117,6 +117,12 @@ const Index = () => {
             <Link to="/events">
               <Button variant="heroOutline" size="xl">
                 Explore Events
+              </Button>
+            </Link>
+            <Link to="/team-management">
+              <Button variant="heroOutline" size="xl" className="group">
+                <Users className="w-5 h-5 mr-2" />
+                <span>Team Management</span>
               </Button>
             </Link>
           </div>
