@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 // Format: Year, Month (0-11), Day, Hour, Minute, Second
 // Example: new Date(2025, 1, 28, 9, 0, 0) = February 28, 2025, 9:00 AM
 // ============================================
-const EVENT_DATE = new Date(2026, 1, 25, 9, 0, 0);
+const EVENT_DATE = new Date(2026, 2, 4, 9, 0, 0);
 
 interface TimeLeft {
   days: number;
