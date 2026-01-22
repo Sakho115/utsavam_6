@@ -752,7 +752,7 @@ const Register = () => {
                         ? 'border-primary bg-primary/10' 
                         : 'border-border/50 hover:border-primary/50'
                     }`}
-                    onClick={() => handleInputChange('morningEvent', event.id)}
+
                   >
                     <RadioGroupItem value={event.id} id={event.id} />
                     <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
@@ -909,7 +909,7 @@ const Register = () => {
                         ? 'border-secondary bg-secondary/10' 
                         : 'border-border/50 hover:border-secondary/50'
                     }`}
-                    onClick={() => handleInputChange('afternoonEvent', event.id)}
+
                   >
                     <RadioGroupItem value={event.id} id={event.id} />
                     <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
