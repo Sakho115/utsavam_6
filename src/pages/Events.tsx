@@ -22,10 +22,10 @@ const morningEvents: Event[] = [
     type: 'Solo',
     timeSlot: 'Morning',
     howItWorks: [
-      'Watch a short video clip on screen',
-      'Deliver live commentary as if broadcasting',
-      'Judges evaluate clarity, creativity, and engagement',
-      'Top performers advance to finals'
+      'Participants compete across multiple language-based challenges involving word association, observation, listening, and spoken expression.',
+      'Tasks include identifying hidden themes, interpreting audio-visual prompts, and delivering confident spoken responses under time limits.',
+      'Challenges test attention to detail, emotional understanding, vocabulary strength, and clarity of expression using both screen and web-based platforms.',
+      'Top-scoring participants progress through successive rounds based on accuracy, creativity, comprehension, and overall performance.'
     ],
     skillsTested: ['Spontaneous speaking', 'Vocabulary', 'Enthusiasm', 'Timing'],
     duration: '5-7 minutes per participant'
@@ -35,10 +35,10 @@ const morningEvents: Event[] = [
     type: 'Pair',
     timeSlot: 'Morning',
     howItWorks: [
-      'Receive a random word or phrase prompt',
-      'Create an impromptu speech or story',
-      'Present within the time limit',
-      'Judged on creativity and language use'
+      'Teams compete in multiple word-based challenges involving rearranging letters, conveying information verbally, and logical word discovery.',
+      'Activities test vocabulary strength, communication clarity, reasoning skills, and teamwork under time constraints.',
+      'Participants must collaborate effectively to decode clues, transmit information accurately, and identify hidden words using limited cues.',
+      'Teams are evaluated on accuracy, creativity, communication, logic, and overall performance across all rounds.'
     ],
     skillsTested: ['Vocabulary', 'Quick thinking', 'Storytelling', 'Expression'],
     duration: '4-6 minutes per participant'
@@ -48,10 +48,10 @@ const morningEvents: Event[] = [
     type: 'Group',
     timeSlot: 'Morning',
     howItWorks: [
-      'Draw a topic from the mystery box',
-      'Get 2 minutes preparation time',
-      'Present your argument for or against',
-      'Respond to counter-arguments from judges'
+      'Teams take part in multiple interactive rounds involving storytelling, perspective-based speaking, and grammar challenges.',
+      'Members collaboratively build stories, express Toast–Roast–Neutral viewpoints, and correct language errors under time pressure.',
+      'Rounds test creativity, spontaneity, language accuracy, and team coordination using on-screen prompts and an online response system.',
+      'Top-performing teams across rounds qualify for the next stage based on overall performance and speed.'
     ],
     skillsTested: ['Argumentation', 'Logic', 'Persuasion', 'Confidence'],
     duration: '8-10 minutes per participant'
@@ -64,10 +64,10 @@ const afternoonEvents: Event[] = [
     type: 'Group',
     timeSlot: 'Afternoon',
     howItWorks: [
-      'Form teams of 4-6 members',
-      'Perform a short skit in English',
-      'Props and costumes allowed',
-      'Judged on script, acting, and teamwork'
+      'Teams participate in creative and language-based rounds combining roleplay, grammar, and quick thinking.',
+      'Members perform short scenes using randomly assigned characters with minimal preparation time.',
+      'Participants also identify correct parts of speech for given words under time pressure.',
+      'Teams are judged on creativity, accuracy, speed, coordination, and overall performance across rounds.'
     ],
     skillsTested: ['Teamwork', 'Acting', 'Script writing', 'Coordination'],
     duration: '10-15 minutes per team'
@@ -77,10 +77,10 @@ const afternoonEvents: Event[] = [
     type: 'Group',
     timeSlot: 'Afternoon',
     howItWorks: [
-      'Teams of 3 members compete',
-      'Multiple rounds: Vocabulary, Grammar, Literature',
-      'Buzzer round for bonus points',
-      'Top scoring team wins'
+      'Teams participate in a campus-wide static treasure hunt to locate and capture multiple hidden checkpoints called Rifts.',
+      'Using a dedicated navigation website and QR-based puzzles, teams must move strategically to unlock locations within the time limit.',
+      'Each captured location is permanently secured for that team after solving the puzzle and obtaining the secret code.',
+      'Winners are decided based on the number of locations captured, with completion speed used as a tie-breaker.'
     ],
     skillsTested: ['General knowledge', 'Language proficiency', 'Team strategy', 'Speed'],
     duration: '45-60 minutes total'
