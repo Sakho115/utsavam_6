@@ -89,12 +89,12 @@ interface RegistrationPayload {
 // ============= EVENT DEFINITIONS (SOURCE OF TRUTH) =============
 const EVENTS: EventDefinition[] = [
   // Morning Events
-  { id: 'trispark', name: 'Trispark', type: 'solo', teamSize: 1, session: 'morning' },
-  { id: 'scramble-zone', name: 'Scramble Zone', type: 'pair', teamSize: 2, session: 'morning' },
-  { id: 'frames-to-fame', name: 'Frames to Fame', type: 'group', teamSize: 3, session: 'morning' },
+  { id: 'morning-event-1', name: 'Morning Event 1', type: 'solo', teamSize: 1, session: 'morning' },
+  { id: 'morning-event-2', name: 'Morning Event 2', type: 'pair', teamSize: 2, session: 'morning' },
+  { id: 'morning-event-3', name: 'Morning Event 3', type: 'group', teamSize: 3, session: 'morning' },
   // Afternoon Events
-  { id: 'wordora', name: 'Wordora', type: 'group', teamSize: 3, session: 'afternoon' },
-  { id: 'static-chase', name: 'The Static Chase', type: 'group', teamSize: 3, session: 'afternoon' },
+  { id: 'afternoon-event-1', name: 'Afternoon Event 1', type: 'group', teamSize: 3, session: 'afternoon' },
+  { id: 'afternoon-event-2', name: 'Afternoon Event 2', type: 'group', teamSize: 3, session: 'afternoon' },
 ];
 
 const MORNING_EVENTS = EVENTS.filter(e => e.session === 'morning');
@@ -129,6 +129,12 @@ const generateAfternoonTeamId = () => {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+};
+
+// Helper functions to get team name when joining
+const getJoinedTeamName = (teams: MorningTeamData[] | AfternoonTeamData[], teamId: string): string => {
+  const team = teams.find(t => t.teamId.toUpperCase() === teamId.toUpperCase());
+  return team?.teamName || '';
 };
 
 // ============= STORAGE FUNCTIONS =============
@@ -198,7 +204,6 @@ const Register = () => {
   // Reset team modes when events change
   useEffect(() => {
     setMorningTeamMode(null);
-
     setMorningTeamName('');
     setJoinMorningTeamId('');
   }, [formData.morningEvent]);
@@ -542,6 +547,7 @@ const Register = () => {
       };
 
       // Build Google Sheets payload - exact column mapping (missing values as empty strings)
+      // Now includes MorningTeamName and AfternoonTeamName for Team Management
       const sheetPayload = {
         Timestamp: registration.timestamp,
         Name: registration.name,
@@ -553,9 +559,13 @@ const Register = () => {
         MorningEventName: selectedMorningEvent?.name || '',
         MorningEventType: registration.morningEventType,
         MorningTeamID: registration.morningTeamId || '',
+        MorningTeamName: morningTeamMode === 'create' ? morningTeamName.trim() : 
+                         (morningTeamMode === 'join' ? getJoinedTeamName(getMorningTeamsFromStorage(), joinMorningTeamId.trim()) : ''),
         AfternoonEventID: registration.afternoonEventId,
         AfternoonEventName: selectedAfternoonEvent?.name || '',
         AfternoonTeamID: registration.afternoonTeamId || '',
+        AfternoonTeamName: afternoonTeamMode === 'create' ? afternoonTeamName.trim() : 
+                           (afternoonTeamMode === 'join' ? getJoinedTeamName(getAfternoonTeamsFromStorage(), joinAfternoonTeamId.trim()) : ''),
         Role: registration.role,
         RegistrationType: registration.registrationType
       };
@@ -752,7 +762,7 @@ const Register = () => {
                         ? 'border-primary bg-primary/10' 
                         : 'border-border/50 hover:border-primary/50'
                     }`}
-
+                    onClick={() => handleInputChange('morningEvent', event.id)}
                   >
                     <RadioGroupItem value={event.id} id={event.id} />
                     <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
@@ -909,7 +919,7 @@ const Register = () => {
                         ? 'border-secondary bg-secondary/10' 
                         : 'border-border/50 hover:border-secondary/50'
                     }`}
-
+                    onClick={() => handleInputChange('afternoonEvent', event.id)}
                   >
                     <RadioGroupItem value={event.id} id={event.id} />
                     <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">

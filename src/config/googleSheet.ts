@@ -1,6 +1,16 @@
 // ============= GOOGLE SHEETS CONFIGURATION =============
 // This is the ONLY place where the Apps Script URL should be defined.
 // Replace this placeholder with your deployed Google Apps Script Web App URL.
+//
+// Your Google Apps Script should support:
+// - POST: Save registration and team data
+// - GET: Fetch team data by email (e.g., ?email=user@email.com)
+//
+// Expected columns in Google Sheets:
+// Timestamp, Name, Email, Phone, College, Department,
+// MorningEventID, MorningEventName, MorningEventType, MorningTeamID, MorningTeamName,
+// AfternoonEventID, AfternoonEventName, AfternoonTeamID, AfternoonTeamName,
+// Role, RegistrationType
 
 export const GOOGLE_SHEET_WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycby2IPXhD_L-D3BhCdZitpjYZROmkUMn4jUjSDe4kwixfBS8oet3tnOQ7-qygHm4Z3yioA/exec";
+  "https://script.google.com/macros/s/AKfycbzMO8md3huGl8ktggRQ2q5IJ8eo9jHRUHbw-jb--ZOAfqqH26Z5kMUH7FmukhRGCM97jw/exec";

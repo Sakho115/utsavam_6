@@ -119,12 +119,6 @@ const Index = () => {
                 Explore Events
               </Button>
             </Link>
-            <Link to="/team-management">
-              <Button variant="heroOutline" size="xl" className="group">
-                <Users className="w-5 h-5 mr-2" />
-                <span>Team Management</span>
-              </Button>
-            </Link>
           </div>
 
           {/* Footer hint */}
