@@ -88,13 +88,13 @@ interface RegistrationPayload {
 
 // ============= EVENT DEFINITIONS (SOURCE OF TRUTH) =============
 const EVENTS: EventDefinition[] = [
-  // Morning Events
-  { id: 'morning-event-1', name: 'Morning Event 1', type: 'solo', teamSize: 1, session: 'morning' },
-  { id: 'morning-event-2', name: 'Morning Event 2', type: 'pair', teamSize: 2, session: 'morning' },
-  { id: 'morning-event-3', name: 'Morning Event 3', type: 'group', teamSize: 3, session: 'morning' },
-  // Afternoon Events
-  { id: 'afternoon-event-1', name: 'Afternoon Event 1', type: 'group', teamSize: 3, session: 'afternoon' },
-  { id: 'afternoon-event-2', name: 'Afternoon Event 2', type: 'group', teamSize: 3, session: 'afternoon' },
+  // Morning Events (OPTIONAL - user can register for morning only)
+  { id: 'trispark', name: 'Trispark', type: 'solo', teamSize: 1, session: 'morning' },
+  { id: 'scramble-zone', name: 'Scramble Zone', type: 'pair', teamSize: 2, session: 'morning' },
+  { id: 'frames-to-fame', name: 'Frames to Fame', type: 'group', teamSize: 3, session: 'morning' },
+  // Afternoon Events (REQUIRES morning event to be selected)
+  { id: 'wordora', name: 'Wordora', type: 'group', teamSize: 3, session: 'afternoon' },
+  { id: 'the-static-chase', name: 'The Static Chase', type: 'group', teamSize: 3, session: 'afternoon' },
 ];
 
 const MORNING_EVENTS = EVENTS.filter(e => e.session === 'morning');
@@ -234,22 +234,27 @@ const Register = () => {
   };
 
   const isFormValid = () => {
-    const baseValid = 
+    // Base personal details validation
+    const personalDetailsValid = 
       formData.fullName.trim() !== '' &&
       formData.college.trim() !== '' &&
       formData.department.trim() !== '' &&
       formData.phone.trim() !== '' &&
-      formData.email.trim() !== '' &&
-      formData.morningEvent !== '' &&
-      formData.afternoonEvent !== '';
+      formData.email.trim() !== '';
 
-    if (!baseValid) return false;
+    if (!personalDetailsValid) return false;
 
-    // Validate morning team if required
-    if (morningRequiresTeam && !isMorningTeamValid()) return false;
+    // RULE: Afternoon event requires morning event
+    if (formData.afternoonEvent && !formData.morningEvent) return false;
 
-    // Validate afternoon team (always required)
-    if (!isAfternoonTeamValid()) return false;
+    // At least morning event must be selected (morning is optional, but need at least one)
+    if (!formData.morningEvent && !formData.afternoonEvent) return false;
+
+    // Validate morning team if morning event requires team
+    if (formData.morningEvent && morningRequiresTeam && !isMorningTeamValid()) return false;
+
+    // Validate afternoon team if afternoon event is selected
+    if (formData.afternoonEvent && !isAfternoonTeamValid()) return false;
 
     return true;
   };
@@ -278,12 +283,15 @@ const Register = () => {
     }
 
     // Event selection validation
-    if (!formData.morningEvent) {
-      toast({ title: 'Please select a morning event', variant: 'destructive' });
+    // RULE: At least morning event must be selected (can skip afternoon)
+    if (!formData.morningEvent && !formData.afternoonEvent) {
+      toast({ title: 'Please select at least a morning event', variant: 'destructive' });
       return false;
     }
-    if (!formData.afternoonEvent) {
-      toast({ title: 'Please select an afternoon event', variant: 'destructive' });
+
+    // RULE: Afternoon event REQUIRES morning event to be selected first
+    if (formData.afternoonEvent && !formData.morningEvent) {
+      toast({ title: 'You must select a morning event to register for an afternoon event', variant: 'destructive' });
       return false;
     }
 
@@ -344,13 +352,13 @@ const Register = () => {
       }
     }
 
-    // Afternoon team validation (always required)
-    if (!afternoonTeamMode) {
+    // Afternoon team validation (only if afternoon event is selected)
+    if (formData.afternoonEvent && !afternoonTeamMode) {
       toast({ title: 'Please select "Create Afternoon Team" or "Join Afternoon Team"', variant: 'destructive' });
       return false;
     }
 
-    if (afternoonTeamMode === 'create') {
+    if (formData.afternoonEvent && afternoonTeamMode === 'create') {
       if (!afternoonTeamName.trim() || afternoonTeamName.trim().length < 2) {
         toast({ title: 'Please enter a valid afternoon team name (at least 2 characters)', variant: 'destructive' });
         return false;
@@ -366,7 +374,7 @@ const Register = () => {
       }
     }
 
-    if (afternoonTeamMode === 'join') {
+    if (formData.afternoonEvent && afternoonTeamMode === 'join') {
       if (!joinAfternoonTeamId.trim()) {
         toast({ title: 'Please enter an Afternoon Team ID', variant: 'destructive' });
         return false;
@@ -471,8 +479,8 @@ const Register = () => {
         }
       }
 
-      // Handle afternoon team creation/joining (always required)
-      if (selectedAfternoonEvent) {
+      // Handle afternoon team creation/joining (only if afternoon event selected)
+      if (formData.afternoonEvent && selectedAfternoonEvent) {
         if (afternoonTeamMode === 'create') {
           if (!morningRequiresTeam || morningTeamMode !== 'create') {
             registrationType = 'AFTERNOON_CREATE';
@@ -529,6 +537,7 @@ const Register = () => {
       }
 
       // Create registration payload for internal use
+      // Safe access - use empty strings/defaults when events are not selected
       const registration: RegistrationPayload = {
         registrationId: generateId(),
         name: formData.fullName.trim(),
@@ -536,59 +545,47 @@ const Register = () => {
         phone: formData.phone.trim(),
         college: formData.college.trim(),
         department: formData.department.trim(),
-        morningEventId: selectedMorningEvent!.id,
-        morningEventType: selectedMorningEvent!.type,
+        morningEventId: selectedMorningEvent ? selectedMorningEvent.id : '',
+        morningEventType: selectedMorningEvent ? selectedMorningEvent.type : 'solo',
         morningTeamId: morningTeamId,
-        afternoonEventId: selectedAfternoonEvent!.id,
+        afternoonEventId: selectedAfternoonEvent ? selectedAfternoonEvent.id : '',
         afternoonTeamId: afternoonTeamId,
         role: isLeader ? 'Leader' : 'Member',
         registrationType: registrationType,
         timestamp: new Date().toISOString()
       };
 
-      // Build Google Sheets payload - exact column mapping (missing values as empty strings)
-      // Now includes MorningTeamName and AfternoonTeamName for Team Management
+      // Build Google Sheets payload with safe optional chaining - never crashes on undefined
       const sheetPayload = {
-        Timestamp: registration.timestamp,
-        Name: registration.name,
-        Email: registration.email,
-        Phone: registration.phone,
-        College: registration.college,
-        Department: registration.department,
-        MorningEventID: registration.morningEventId,
-        MorningEventName: selectedMorningEvent?.name || '',
-        MorningEventType: registration.morningEventType,
-        MorningTeamID: registration.morningTeamId || '',
+        Name: formData.fullName.trim(),
+        Email: formData.email.trim(),
+        Phone: formData.phone.trim(),
+        College: formData.college.trim(),
+        Department: formData.department.trim(),
+        MorningEventID: selectedMorningEvent?.id || "",
+        MorningEventName: selectedMorningEvent?.name || "",
+        MorningEventType: selectedMorningEvent?.type || "",
+        MorningTeamID: morningTeamId || "",
         MorningTeamName: morningTeamMode === 'create' ? morningTeamName.trim() : 
                          (morningTeamMode === 'join' ? getJoinedTeamName(getMorningTeamsFromStorage(), joinMorningTeamId.trim()) : ''),
-        AfternoonEventID: registration.afternoonEventId,
-        AfternoonEventName: selectedAfternoonEvent?.name || '',
-        AfternoonTeamID: registration.afternoonTeamId || '',
+        AfternoonEventID: selectedAfternoonEvent?.id || "",
+        AfternoonEventName: selectedAfternoonEvent?.name || "",
+        AfternoonTeamID: afternoonTeamId || "",
         AfternoonTeamName: afternoonTeamMode === 'create' ? afternoonTeamName.trim() : 
                            (afternoonTeamMode === 'join' ? getJoinedTeamName(getAfternoonTeamsFromStorage(), joinAfternoonTeamId.trim()) : ''),
-        Role: registration.role,
-        RegistrationType: registration.registrationType
+        Role: isLeader ? "Leader" : "Member",
+        RegistrationType: registrationType
       };
 
-      // Submit to Google Sheets (only if URL is configured)
-      // Using text/plain to avoid CORS preflight request
-      if (GOOGLE_SHEET_WEBAPP_URL && !GOOGLE_SHEET_WEBAPP_URL.includes('PASTE_YOUR')) {
-        try {
-          const response = await fetch(GOOGLE_SHEET_WEBAPP_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'text/plain;charset=utf-8',
-            },
-            body: JSON.stringify(sheetPayload),
-          });
-
-          // Google Apps Script may return opaque response, so we don't check response.ok strictly
-          console.log('Google Sheets submission sent');
-        } catch (sheetError) {
-          // Log but don't block - localStorage backup exists
-          console.warn('Google Sheets submission warning:', sheetError);
-        }
-      }
+      // Submit to Google Sheets using no-cors mode (CORS-safe, no response parsing)
+      await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(sheetPayload)
+      });
 
       // Store in localStorage as backup
       const existingData = localStorage.getItem('utsavam_registrations');
@@ -596,7 +593,7 @@ const Register = () => {
       registrations.registrations.push(registration);
       localStorage.setItem('utsavam_registrations', JSON.stringify(registrations));
 
-      // Navigate to success page
+      // Always navigate to success (Google Sheets failure must not block user)
       navigate('/registration-success', { 
         state: { 
           registration,
@@ -608,7 +605,9 @@ const Register = () => {
       });
     } catch (error) {
       console.error('Registration error:', error);
-      toast({ title: 'Registration failed. Please try again.', variant: 'destructive' });
+      // Still navigate to success - don't block user due to network issues
+      navigate('/registration-success');
+    } finally {
       setIsSubmitting(false);
     }
   };
