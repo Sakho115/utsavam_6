@@ -1,0 +1,692 @@
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Sparkles, User, Users, AlertCircle, UserPlus, UsersRound, Copy, Check } from 'lucide-react';
+import heroBg from '@/assets/hero-bg.jpg';
+import {
+  createTeam,
+  getTeamByTeamId,
+  checkTeamNameExists,
+  joinTeam,
+  saveRegistration,
+  generateTeamId,
+  generateRegistrationId,
+  type TeamMember,
+} from '@/lib/teamService';
+
+interface FormData {
+  fullName: string;
+  college: string;
+  department: string;
+  phone: string;
+  email: string;
+  morningEvent: string;
+  afternoonEvent: string;
+}
+
+interface Registration extends FormData {
+  id: string;
+  registeredAt: string;
+  type: 'SOLO' | 'CREATE_TEAM' | 'JOIN_TEAM';
+  teamId?: string;
+  teamName?: string;
+  isTeamLeader?: boolean;
+}
+
+type GroupMode = 'create' | 'join' | null;
+
+const morningEvents = [
+  { id: 'commentary-clash', name: 'Commentary Clash' },
+  { id: 'word-wizard', name: 'Word Wizard' },
+  { id: 'debate-duel', name: 'Debate Duel' }
+];
+
+const afternoonEvents = [
+  { id: 'skit-spectacular', name: 'Skit Spectacular' },
+  { id: 'quiz-quest', name: 'Quiz Quest' }
+];
+
+const Register = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedTeamId, setCopiedTeamId] = useState(false);
+  const [groupMode, setGroupMode] = useState<GroupMode>(null);
+  const [teamName, setTeamName] = useState('');
+  const [teamSize, setTeamSize] = useState(4);
+  const [joinTeamId, setJoinTeamId] = useState('');
+  const [generatedTeamId, setGeneratedTeamId] = useState<string | null>(null);
+  
+  const [formData, setFormData] = useState<FormData>({
+    fullName: '',
+    college: '',
+    department: '',
+    phone: '',
+    email: '',
+    morningEvent: '',
+    afternoonEvent: ''
+  });
+
+  // Reset group mode when afternoon event changes
+  useEffect(() => {
+    setGroupMode(null);
+    setTeamName('');
+    setTeamSize(4);
+    setJoinTeamId('');
+  }, [formData.afternoonEvent]);
+
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const isGroupEventSelected = formData.afternoonEvent !== '';
+
+  const isTeamFieldsValid = (): boolean => {
+    if (!isGroupEventSelected) return true;
+    
+    if (groupMode === 'create') {
+      return teamName.trim().length >= 2 && teamSize >= 2 && teamSize <= 6;
+    }
+    
+    if (groupMode === 'join') {
+      return joinTeamId.trim().length > 0;
+    }
+    
+    return false;
+  };
+
+  const isFormValid = () => {
+    const baseValid = 
+      formData.fullName.trim() !== '' &&
+      formData.college.trim() !== '' &&
+      formData.department.trim() !== '' &&
+      formData.phone.trim() !== '' &&
+      formData.email.trim() !== '' &&
+      formData.morningEvent !== '' &&
+      formData.afternoonEvent !== '';
+
+    if (!baseValid) return false;
+
+    // Group event requires mode selection and valid team fields
+    if (isGroupEventSelected) {
+      return groupMode !== null && isTeamFieldsValid();
+    }
+
+    return true;
+  };
+
+  const validateBasicFields = (): boolean => {
+    if (!formData.fullName.trim()) {
+      toast({ title: 'Please enter your full name', variant: 'destructive' });
+      return false;
+    }
+    if (!formData.college.trim()) {
+      toast({ title: 'Please enter your college name', variant: 'destructive' });
+      return false;
+    }
+    if (!formData.department.trim()) {
+      toast({ title: 'Please enter your department and year', variant: 'destructive' });
+      return false;
+    }
+    if (!formData.phone.trim() || !/^\d{10}$/.test(formData.phone.trim())) {
+      toast({ title: 'Please enter a valid 10-digit phone number', variant: 'destructive' });
+      return false;
+    }
+    if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast({ title: 'Please enter a valid email address', variant: 'destructive' });
+      return false;
+    }
+    if (!formData.morningEvent) {
+      toast({ title: 'Please select a morning event', variant: 'destructive' });
+      return false;
+    }
+    if (!formData.afternoonEvent) {
+      toast({ title: 'Please select an afternoon event', variant: 'destructive' });
+      return false;
+    }
+
+    // Validate group mode and team fields
+    if (isGroupEventSelected) {
+      if (!groupMode) {
+        toast({ title: 'Please select "Create Team" or "Join Team"', variant: 'destructive' });
+        return false;
+      }
+
+      if (groupMode === 'create') {
+        if (!teamName.trim() || teamName.trim().length < 2) {
+          toast({ title: 'Please enter a valid team name (at least 2 characters)', variant: 'destructive' });
+          return false;
+        }
+        if (teamSize < 2 || teamSize > 6) {
+          toast({ title: 'Team size must be between 2 and 6', variant: 'destructive' });
+          return false;
+        }
+      }
+
+      if (groupMode === 'join') {
+        if (!joinTeamId.trim()) {
+          toast({ title: 'Please enter a Team ID', variant: 'destructive' });
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateBasicFields()) return;
+
+    setIsSubmitting(true);
+
+    const eventMorningName = morningEvents.find(e => e.id === formData.morningEvent)?.name || formData.morningEvent;
+    const eventAfternoonName = afternoonEvents.find(e => e.id === formData.afternoonEvent)?.name || formData.afternoonEvent;
+
+    try {
+      let registrationType: 'SOLO' | 'CREATE_TEAM' | 'JOIN_TEAM' = 'SOLO';
+      let teamIdForRegistration: string | undefined;
+      let teamNameForRegistration: string | undefined;
+      let isTeamLeader = false;
+
+      if (isGroupEventSelected && groupMode === 'create') {
+        // Check if team name already exists in Lovable Cloud
+        const nameExists = await checkTeamNameExists(teamName.trim(), eventAfternoonName);
+        if (nameExists) {
+          toast({ title: 'A team with this name already exists for this event', variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Create new team in Lovable Cloud
+        registrationType = 'CREATE_TEAM';
+        const newTeamId = generateTeamId('Afternoon');
+        teamIdForRegistration = newTeamId;
+        teamNameForRegistration = teamName.trim();
+        isTeamLeader = true;
+
+        const createResult = await createTeam({
+          team_id: newTeamId,
+          team_name: teamName.trim(),
+          event_type: 'Afternoon',
+          event_name: eventAfternoonName,
+          team_size: teamSize,
+          leader_name: formData.fullName.trim(),
+          leader_email: formData.email.trim(),
+          leader_phone: formData.phone.trim(),
+          leader_college: formData.college.trim(),
+          leader_department: formData.department.trim(),
+          members: [],
+          status: teamSize === 1 ? 'FULL' : 'OPEN',
+        });
+
+        if (!createResult.success) {
+          toast({ title: createResult.error || 'Failed to create team', variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        setGeneratedTeamId(newTeamId);
+      } else if (isGroupEventSelected && groupMode === 'join') {
+        // Fetch team from Lovable Cloud and validate
+        const teamResult = await getTeamByTeamId(joinTeamId.trim());
+        
+        if (!teamResult.success || !teamResult.team) {
+          toast({ title: 'Invalid Team ID. Please check and try again.', variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
+        }
+
+        const team = teamResult.team;
+
+        // Check if team is for the selected event
+        if (team.event_name !== eventAfternoonName) {
+          toast({ title: `This team is for "${team.event_name}", not "${eventAfternoonName}"`, variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (team.status === 'FULL') {
+          toast({ title: 'This team is already full', variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Check if email already exists in team
+        const emailExists = team.leader_email === formData.email.trim() || 
+          team.members.some(m => m.email === formData.email.trim());
+        if (emailExists) {
+          toast({ title: 'You are already registered in this team', variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Join team in Lovable Cloud
+        registrationType = 'JOIN_TEAM';
+        const newMember: TeamMember = {
+          name: formData.fullName.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          college: formData.college.trim(),
+          department: formData.department.trim(),
+          joinedAt: new Date().toISOString()
+        };
+
+        const joinResult = await joinTeam(joinTeamId.trim(), newMember);
+        
+        if (!joinResult.success) {
+          toast({ title: joinResult.error || 'Failed to join team', variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
+        }
+
+        teamIdForRegistration = team.team_id;
+        teamNameForRegistration = team.team_name;
+      }
+
+      // Save registration to Lovable Cloud
+      const regResult = await saveRegistration({
+        registration_id: generateRegistrationId(),
+        full_name: formData.fullName.trim(),
+        college: formData.college.trim(),
+        department: formData.department.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+        morning_event: eventMorningName,
+        afternoon_event: eventAfternoonName,
+        registration_type: registrationType,
+        team_id: teamIdForRegistration,
+        team_name: teamNameForRegistration,
+        is_team_leader: isTeamLeader,
+      });
+
+      if (!regResult.success) {
+        toast({ title: regResult.error || 'Failed to save registration', variant: 'destructive' });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create local registration object for success page
+      const registration: Registration = {
+        id: generateRegistrationId(),
+        ...formData,
+        morningEvent: eventMorningName,
+        afternoonEvent: eventAfternoonName,
+        registeredAt: new Date().toISOString(),
+        type: registrationType,
+        teamId: teamIdForRegistration,
+        teamName: teamNameForRegistration,
+        isTeamLeader: isTeamLeader
+      };
+
+      // Navigate to success page with registration data
+      navigate('/registration-success', { 
+        state: { 
+          registration,
+          generatedTeamId: registrationType === 'CREATE_TEAM' ? teamIdForRegistration : undefined
+        } 
+      });
+    } catch (error) {
+      toast({ title: 'Registration failed. Please try again.', variant: 'destructive' });
+      setIsSubmitting(false);
+    }
+  };
+
+  const copyTeamId = () => {
+    if (generatedTeamId) {
+      navigator.clipboard.writeText(generatedTeamId);
+      setCopiedTeamId(true);
+      setTimeout(() => setCopiedTeamId(false), 2000);
+      toast({ title: 'Team ID copied to clipboard!' });
+    }
+  };
+
+  const showEventValidationMessage = !formData.morningEvent || !formData.afternoonEvent;
+  const showGroupModeMessage = isGroupEventSelected && !groupMode;
+
+  return (
+    <div className="relative min-h-screen">
+      {/* Background */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
+        style={{ backgroundImage: `url(${heroBg})` }}
+      >
+        <div className="absolute inset-0 bg-gradient-hero" />
+        <div className="absolute inset-0 bg-background/80" />
+      </div>
+
+      <div className="relative z-10 px-4 py-8 md:py-12 max-w-2xl mx-auto">
+        {/* Back Button */}
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Home</span>
+        </Link>
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground text-glow mb-3">
+            Register for Utsavam 6.0
+          </h1>
+          <p className="text-muted-foreground">
+            Fill in your details and choose your events
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Personal Details Card */}
+          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Personal Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  placeholder="Enter your full name"
+                  value={formData.fullName}
+                  onChange={(e) => handleInputChange('fullName', e.target.value)}
+                  className="bg-input/50 border-border/50 focus:border-primary"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="college">College Name</Label>
+                <Input
+                  id="college"
+                  placeholder="Enter your college name"
+                  value={formData.college}
+                  onChange={(e) => handleInputChange('college', e.target.value)}
+                  className="bg-input/50 border-border/50 focus:border-primary"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="department">Department / Year</Label>
+                <Input
+                  id="department"
+                  placeholder="e.g., CSE / 3rd Year"
+                  value={formData.department}
+                  onChange={(e) => handleInputChange('department', e.target.value)}
+                  className="bg-input/50 border-border/50 focus:border-primary"
+                />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="10-digit number"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className="bg-input/50 border-border/50 focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email ID</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className="bg-input/50 border-border/50 focus:border-primary"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Morning Events Card */}
+          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-primary" />
+                Morning Event
+                <span className="text-sm font-normal text-muted-foreground ml-2">(Choose 1 Solo Event)</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={formData.morningEvent}
+                onValueChange={(value) => handleInputChange('morningEvent', value)}
+                className="space-y-3"
+              >
+                {morningEvents.map((event) => (
+                  <div 
+                    key={event.id}
+                    className={`flex items-center space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                      formData.morningEvent === event.id 
+                        ? 'border-primary bg-primary/10' 
+                        : 'border-border/50 hover:border-primary/50'
+                    }`}
+                    onClick={() => handleInputChange('morningEvent', event.id)}
+                  >
+                    <RadioGroupItem value={event.id} id={event.id} />
+                    <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
+                      {event.name}
+                    </Label>
+                    <User className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* Afternoon Events Card */}
+          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-secondary" />
+                Afternoon Event
+                <span className="text-sm font-normal text-muted-foreground ml-2">(Choose 1 Group Event)</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={formData.afternoonEvent}
+                onValueChange={(value) => handleInputChange('afternoonEvent', value)}
+                className="space-y-3"
+              >
+                {afternoonEvents.map((event) => (
+                  <div 
+                    key={event.id}
+                    className={`flex items-center space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                      formData.afternoonEvent === event.id 
+                        ? 'border-secondary bg-secondary/10' 
+                        : 'border-border/50 hover:border-secondary/50'
+                    }`}
+                    onClick={() => handleInputChange('afternoonEvent', event.id)}
+                  >
+                    <RadioGroupItem value={event.id} id={event.id} />
+                    <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
+                      {event.name}
+                    </Label>
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* Group Registration Mode Card - Only shown when afternoon event is selected */}
+          {isGroupEventSelected && (
+            <Card className="bg-card/60 backdrop-blur-sm border-border/50 animate-fade-in">
+              <CardHeader className="pb-4">
+                <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                  <UsersRound className="w-5 h-5 text-secondary" />
+                  Team Registration
+                  <span className="text-sm font-normal text-muted-foreground ml-2">(Required for group events)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Group Mode Selection */}
+                <RadioGroup
+                  value={groupMode || ''}
+                  onValueChange={(value) => setGroupMode(value as GroupMode)}
+                  className="grid sm:grid-cols-2 gap-3"
+                >
+                  <div 
+                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${
+                      groupMode === 'create' 
+                        ? 'border-primary bg-primary/10' 
+                        : 'border-border/50 hover:border-primary/50'
+                    }`}
+                    onClick={() => setGroupMode('create')}
+                  >
+                    <RadioGroupItem value="create" id="create-team" />
+                    <div className="flex-1">
+                      <Label htmlFor="create-team" className="cursor-pointer font-medium flex items-center gap-2">
+                        <UserPlus className="w-4 h-4" />
+                        Create Team
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">Start a new team as leader</p>
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${
+                      groupMode === 'join' 
+                        ? 'border-primary bg-primary/10' 
+                        : 'border-border/50 hover:border-primary/50'
+                    }`}
+                    onClick={() => setGroupMode('join')}
+                  >
+                    <RadioGroupItem value="join" id="join-team" />
+                    <div className="flex-1">
+                      <Label htmlFor="join-team" className="cursor-pointer font-medium flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Join Team
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">Join an existing team</p>
+                    </div>
+                  </div>
+                </RadioGroup>
+
+                {/* Create Team Fields */}
+                {groupMode === 'create' && (
+                  <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
+                    <div className="space-y-2">
+                      <Label htmlFor="teamName">Team Name</Label>
+                      <Input
+                        id="teamName"
+                        placeholder="Enter a unique team name"
+                        value={teamName}
+                        onChange={(e) => setTeamName(e.target.value)}
+                        className="bg-input/50 border-border/50 focus:border-primary"
+                        maxLength={30}
+                      />
+                      <p className="text-xs text-muted-foreground">Choose a memorable name for your team</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="teamSize">Team Size (including you)</Label>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          id="teamSize"
+                          type="number"
+                          min={2}
+                          max={6}
+                          value={teamSize}
+                          onChange={(e) => setTeamSize(Math.min(6, Math.max(2, parseInt(e.target.value) || 2)))}
+                          className="bg-input/50 border-border/50 focus:border-primary w-24"
+                        />
+                        <span className="text-sm text-muted-foreground">members (2-6)</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/20 p-3 rounded-lg text-sm text-muted-foreground">
+                      <p className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-primary" />
+                        A unique Team ID will be generated after registration. Share it with your teammates.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Join Team Fields */}
+                {groupMode === 'join' && (
+                  <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
+                    <div className="space-y-2">
+                      <Label htmlFor="joinTeamId">Team ID</Label>
+                      <Input
+                        id="joinTeamId"
+                        placeholder="e.g., TEAM-A1B2"
+                        value={joinTeamId}
+                        onChange={(e) => setJoinTeamId(e.target.value.toUpperCase())}
+                        className="bg-input/50 border-border/50 focus:border-primary uppercase"
+                        maxLength={9}
+                      />
+                      <p className="text-xs text-muted-foreground">Get this ID from your team leader</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Validation Messages */}
+          {showEventValidationMessage && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-primary" />
+              <span>Please select 1 morning and 1 afternoon event to continue.</span>
+            </div>
+          )}
+
+          {showGroupModeMessage && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-secondary" />
+              <span>Please select "Create Team" or "Join Team" for the group event.</span>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <Button 
+            type="submit" 
+            variant="hero" 
+            size="xl" 
+            className="w-full group"
+            disabled={!isFormValid() || isSubmitting}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                Registering...
+              </span>
+            ) : (
+              <>
+                <span>Complete Registration</span>
+                <Sparkles className="w-5 h-5 transition-transform group-hover:rotate-12" />
+              </>
+            )}
+          </Button>
+
+          {/* Event Details Link */}
+          <p className="text-center text-sm text-muted-foreground">
+            Not sure which events to choose?{' '}
+            <Link to="/events" className="text-primary hover:underline">
+              Explore all events
+            </Link>
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default Register;

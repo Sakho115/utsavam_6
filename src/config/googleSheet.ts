@@ -13,4 +13,4 @@
 // Role, RegistrationType
 
 export const GOOGLE_SHEET_WEBAPP_URL =
-  "https://script.google.com/macros/s/AKfycbzMO8md3huGl8ktggRQ2q5IJ8eo9jHRUHbw-jb--ZOAfqqH26Z5kMUH7FmukhRGCM97jw/exec";
+  import.meta.env.VITE_GOOGLE_SHEET_WEBAPP_URL || "";

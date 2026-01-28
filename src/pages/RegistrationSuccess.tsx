@@ -1,26 +1,26 @@
+
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle2, Home, Gamepad2, User, Clock, Users, Copy, Check, Sun, Sunset } from 'lucide-react';
+import { Sparkles, CheckCircle2, Home, Gamepad2, User, Clock, Users, Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import heroBg from '@/assets/hero-bg.jpg';
 
-interface RegistrationPayload {
-  registrationId: string;
-  name: string;
-  email: string;
-  phone: string;
+interface Registration {
+  id: string;
+  fullName: string;
   college: string;
   department: string;
-  morningEventId: string;
-  morningEventType: 'solo' | 'pair' | 'group';
-  morningTeamId: string | null;
-  afternoonEventId: string;
-  afternoonTeamId: string | null;
-  role: 'Leader' | 'Member';
-  registrationType: 'SOLO' | 'MORNING_CREATE' | 'MORNING_JOIN' | 'AFTERNOON_CREATE' | 'AFTERNOON_JOIN';
-  timestamp: string;
+  phone: string;
+  email: string;
+  morningEvent: string;
+  afternoonEvent: string;
+  registeredAt: string;
+  type?: 'SOLO' | 'CREATE_TEAM' | 'JOIN_TEAM';
+  teamId?: string;
+  teamName?: string;
+  isTeamLeader?: boolean;
 }
 
 const RegistrationSuccess = () => {
@@ -29,20 +29,17 @@ const RegistrationSuccess = () => {
   const { toast } = useToast();
   const [isLoaded, setIsLoaded] = useState(false);
   const [showConfetti, setShowConfetti] = useState(true);
-  const [copiedMorningTeamId, setCopiedMorningTeamId] = useState(false);
-  const [copiedAfternoonTeamId, setCopiedAfternoonTeamId] = useState(false);
+  const [copiedTeamId, setCopiedTeamId] = useState(false);
 
-  // Safely extract state with fallbacks to prevent crashes
-  const registration = location.state?.registration as RegistrationPayload | undefined;
+  const registration = location.state?.registration as Registration | undefined;
   const generatedMorningTeamId = location.state?.generatedMorningTeamId as string | undefined;
   const generatedAfternoonTeamId = location.state?.generatedAfternoonTeamId as string | undefined;
   const morningEventName = location.state?.morningEventName as string | undefined;
   const afternoonEventName = location.state?.afternoonEventName as string | undefined;
 
   useEffect(() => {
-    // Redirect to home if no registration data (prevents crash on direct access)
     if (!registration) {
-      navigate('/', { replace: true });
+      navigate('/');
       return;
     }
     setIsLoaded(true);
@@ -50,43 +47,23 @@ const RegistrationSuccess = () => {
     return () => clearTimeout(timer);
   }, [registration, navigate]);
 
-  const copyMorningTeamId = () => {
-    const teamId = generatedMorningTeamId || registration?.morningTeamId;
-    if (teamId) {
-      navigator.clipboard.writeText(teamId);
-      setCopiedMorningTeamId(true);
-      setTimeout(() => setCopiedMorningTeamId(false), 2000);
-      toast({ title: 'Morning Team ID copied to clipboard!' });
-    }
-  };
-
-  const copyAfternoonTeamId = () => {
-    const teamId = generatedAfternoonTeamId || registration?.afternoonTeamId;
-    if (teamId) {
-      navigator.clipboard.writeText(teamId);
-      setCopiedAfternoonTeamId(true);
-      setTimeout(() => setCopiedAfternoonTeamId(false), 2000);
-      toast({ title: 'Afternoon Team ID copied to clipboard!' });
-    }
+  const copyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedTeamId(true);
+    setTimeout(() => setCopiedTeamId(false), 2000);
+    toast({ title: 'Team ID copied to clipboard!' });
   };
 
   if (!registration) return null;
 
-  const hasMorningTeam = registration.morningTeamId !== null;
-  const hasAfternoonTeam = registration.afternoonTeamId !== null;
-  const createdMorningTeam = generatedMorningTeamId !== undefined;
-  const createdAfternoonTeam = generatedAfternoonTeamId !== undefined;
-
-  const getMorningEventTypeLabel = () => {
-    if (registration.morningEventType === 'solo') return 'Solo';
-    if (registration.morningEventType === 'pair') return 'Pair';
-    return 'Group';
-  };
+  const isTeamCreator = registration.type === 'CREATE_TEAM';
+  const isTeamMember = registration.type === 'JOIN_TEAM';
+  const hasTeam = isTeamCreator || isTeamMember;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Background */}
-      <div 
+      <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
@@ -115,10 +92,9 @@ const RegistrationSuccess = () => {
 
       <div className="relative z-10 px-4 py-12 md:py-20 max-w-2xl mx-auto">
         {/* Success Icon */}
-        <div 
-          className={`flex justify-center mb-6 transition-all duration-700 ${
-            isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-          }`}
+        <div
+          className={`flex justify-center mb-6 transition-all duration-700 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+            }`}
         >
           <div className="relative">
             <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full animate-pulse-glow" />
@@ -129,112 +105,94 @@ const RegistrationSuccess = () => {
         </div>
 
         {/* Header */}
-        <div 
-          className={`text-center mb-8 transition-all duration-700 ${
-            isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-          }`}
+        <div
+          className={`text-center mb-8 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
           style={{ transitionDelay: '200ms' }}
         >
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground text-glow mb-3">
             You're Registered! 🎉
           </h1>
           <p className="text-lg text-muted-foreground">
-            {/* Safe access: use optional chaining and fallback to prevent crash if name is undefined */}
-            Welcome to Utsavam 6.0, {registration?.name?.split(' ')?.[0] || 'Participant'}!
+            Welcome to Utsavam 6.0, {registration.fullName?.split(' ')[0] || 'Participant'}!
           </p>
         </div>
 
-        {/* Morning Team ID Card - Only shown for morning team creators */}
-        {createdMorningTeam && generatedMorningTeamId && (
-          <Card 
-            className={`bg-primary/10 border-primary/30 mb-4 transition-all duration-700 ${
-              isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
-            style={{ transitionDelay: '300ms' }}
-          >
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <Sun className="w-5 h-5 text-primary" />
-                <h3 className="font-display text-lg font-semibold text-foreground">Morning Team ID</h3>
-              </div>
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <span className="font-mono text-2xl md:text-3xl font-bold text-primary tracking-widest">
-                  {generatedMorningTeamId}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={copyMorningTeamId}
-                  className="gap-2"
-                >
-                  {copiedMorningTeamId ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Share this with your morning teammates so they can join your team!
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {/* Generated Team IDs */}
+        {(generatedMorningTeamId || generatedAfternoonTeamId) && (
+          <div className="space-y-4 mb-6">
+            {generatedMorningTeamId && (
+              <Card
+                className={`bg-primary/10 border-primary/30 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                  }`}
+                style={{ transitionDelay: '300ms' }}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <Users className="w-5 h-5 text-primary" />
+                    <h3 className="font-display text-lg font-semibold text-foreground">
+                      Morning Team ID {morningEventName ? `(${morningEventName})` : ''}
+                    </h3>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 mb-3">
+                    <span className="font-mono text-xl md:text-2xl font-bold text-primary tracking-widest">
+                      {generatedMorningTeamId}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyId(generatedMorningTeamId)}
+                      className="gap-2"
+                    >
+                      <Copy className="w-4 h-4" /> Copy
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Share this ID with your teammates!
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-        {/* Afternoon Team ID Card - Only shown for afternoon team creators */}
-        {createdAfternoonTeam && generatedAfternoonTeamId && (
-          <Card 
-            className={`bg-secondary/10 border-secondary/30 mb-6 transition-all duration-700 ${
-              isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
-            style={{ transitionDelay: '350ms' }}
-          >
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <Sunset className="w-5 h-5 text-secondary" />
-                <h3 className="font-display text-lg font-semibold text-foreground">Afternoon Team ID</h3>
-              </div>
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <span className="font-mono text-2xl md:text-3xl font-bold text-secondary tracking-widest">
-                  {generatedAfternoonTeamId}
-                </span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={copyAfternoonTeamId}
-                  className="gap-2"
-                >
-                  {copiedAfternoonTeamId ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Share this with your afternoon teammates so they can join your team!
-              </p>
-            </CardContent>
-          </Card>
+            {generatedAfternoonTeamId && (
+              <Card
+                className={`bg-secondary/10 border-secondary/30 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                  }`}
+                style={{ transitionDelay: '350ms' }}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <Users className="w-5 h-5 text-secondary" />
+                    <h3 className="font-display text-lg font-semibold text-foreground">
+                      Afternoon Team ID {afternoonEventName ? `(${afternoonEventName})` : ''}
+                    </h3>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 mb-3">
+                    <span className="font-mono text-xl md:text-2xl font-bold text-secondary tracking-widest">
+                      {generatedAfternoonTeamId}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyId(generatedAfternoonTeamId)}
+                      className="gap-2"
+                    >
+                      <Copy className="w-4 h-4" /> Copy
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Share this ID with your teammates!
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
         {/* Registration Summary */}
-        <Card 
-          className={`bg-card/60 backdrop-blur-sm border-border/50 mb-8 transition-all duration-700 ${
-            isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-          }`}
+        <Card
+          className={`bg-card/60 backdrop-blur-sm border-border/50 mb-8 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
           style={{ transitionDelay: '400ms' }}
         >
           <CardContent className="p-6 space-y-6">
@@ -244,7 +202,7 @@ const RegistrationSuccess = () => {
                 <User className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="font-display text-xl text-foreground">{registration.name}</p>
+                <p className="font-display text-xl text-foreground">{registration.fullName}</p>
                 <p className="text-sm text-muted-foreground">{registration.college}</p>
               </div>
             </div>
@@ -254,41 +212,33 @@ const RegistrationSuccess = () => {
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Your Selected Events
               </h3>
-              
+
               <div className="grid gap-3">
                 {/* Morning Event */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/10 border border-primary/30">
-                  <Sun className="w-5 h-5 text-primary" />
+                  <div className="w-3 h-3 rounded-full bg-primary" />
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">{morningEventName || registration.morningEventId}</p>
+                    <p className="font-medium text-foreground">{registration.morningEvent}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Morning Session • {getMorningEventTypeLabel()}
+                      <Clock className="w-3 h-3" /> Morning Session • Solo
                     </p>
                   </div>
-                  {hasMorningTeam && (
-                    <div className="text-right">
-                      <p className="text-xs font-mono text-primary">{registration.morningTeamId}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {createdMorningTeam ? 'Team Leader' : 'Team Member'}
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Afternoon Event */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/10 border border-secondary/30">
-                  <Sunset className="w-5 h-5 text-secondary" />
+                  <div className="w-3 h-3 rounded-full bg-secondary" />
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">{afternoonEventName || registration.afternoonEventId}</p>
+                    <p className="font-medium text-foreground">{registration.afternoonEvent}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Clock className="w-3 h-3" /> Afternoon Session • Group
                     </p>
                   </div>
-                  {hasAfternoonTeam && (
+                  {hasTeam && (
                     <div className="text-right">
-                      <p className="text-xs font-mono text-secondary">{registration.afternoonTeamId}</p>
+                      <p className="text-xs font-medium text-foreground">{registration.teamName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {createdAfternoonTeam ? 'Team Leader' : 'Team Member'}
+                        {isTeamCreator ? 'Team Leader' : 'Team Member'}
                       </p>
                     </div>
                   )}
@@ -296,41 +246,31 @@ const RegistrationSuccess = () => {
               </div>
             </div>
 
-            {/* Team Info Summary */}
-            {(hasMorningTeam || hasAfternoonTeam) && (
+            {/* Team Info for members who joined */}
+            {isTeamMember && registration.teamId && (
               <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Team Summary</span>
-                </div>
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  {hasMorningTeam && (
-                    <p>Morning Team: <span className="font-mono text-primary">{registration.morningTeamId}</span></p>
-                  )}
-                  {hasAfternoonTeam && (
-                    <p>Afternoon Team: <span className="font-mono text-secondary">{registration.afternoonTeamId}</span></p>
-                  )}
-                  <p className="text-muted-foreground/70 mt-2 italic">
-                    ⚠️ Morning and afternoon teams are separate – share the correct Team ID with your teammates!
-                  </p>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  You've joined team <span className="font-semibold text-foreground">{registration.teamName}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Team ID: <span className="font-mono">{registration.teamId}</span>
+                </p>
               </div>
             )}
 
             {/* Registration ID */}
             <div className="pt-4 border-t border-border/50">
               <p className="text-xs text-muted-foreground text-center">
-                Registration ID: <span className="font-mono text-foreground/80">{registration.registrationId}</span>
+                Registration ID: <span className="font-mono text-foreground/80">{registration.id}</span>
               </p>
             </div>
           </CardContent>
         </Card>
 
         {/* Action Buttons */}
-        <div 
-          className={`space-y-4 transition-all duration-700 ${
-            isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-          }`}
+        <div
+          className={`space-y-4 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
           style={{ transitionDelay: '600ms' }}
         >
           <Link to="/" className="block">
@@ -350,10 +290,9 @@ const RegistrationSuccess = () => {
         </div>
 
         {/* Footer Note */}
-        <p 
-          className={`text-center text-sm text-muted-foreground mt-8 transition-all duration-700 ${
-            isLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+        <p
+          className={`text-center text-sm text-muted-foreground mt-8 transition-all duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
           style={{ transitionDelay: '800ms' }}
         >
           A confirmation email has been sent to {registration.email}
@@ -377,3 +316,4 @@ const RegistrationSuccess = () => {
 };
 
 export default RegistrationSuccess;
+

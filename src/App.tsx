@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,10 +8,12 @@ import Index from "./pages/Index";
 import LearnMore from "./pages/LearnMore";
 import WordSearchGame from "./pages/WordSearchGame";
 import MagicalSorter from "./pages/MagicalSorter";
+
 import Register from "./pages/Register";
 import RegistrationSuccess from "./pages/RegistrationSuccess";
 import Events from "./pages/Events";
 import Extras from "./pages/Extras";
+import TeamManagement from "./pages/TeamManagement";
 import SynonymChallenge from "./components/games/SynonymChallenge";
 import SentenceFixer from "./components/games/SentenceFixer";
 import GuessTheWord from "./components/games/GuessTheWord";
@@ -31,11 +34,13 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/registration-success" element={<RegistrationSuccess />} />
           <Route path="/extras" element={<Extras />} />
+          <Route path="/team-management" element={<TeamManagement />} />
           <Route path="/word-search" element={<WordSearchGame />} />
           <Route path="/magical-sorter" element={<MagicalSorter />} />
           <Route path="/synonym-challenge" element={<SynonymChallenge />} />
           <Route path="/sentence-fixer" element={<SentenceFixer />} />
           <Route path="/guess-the-word" element={<GuessTheWord />} />
+
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -45,3 +50,4 @@ const App = () => (
 );
 
 export default App;
+

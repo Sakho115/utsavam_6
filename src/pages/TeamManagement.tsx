@@ -1,189 +1,141 @@
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  ArrowLeft, Users, Search, Crown, User, Mail, 
-  Sun, Sunset, Loader2, AlertCircle
+  ArrowLeft, 
+  Users, 
+  Search, 
+  Crown, 
+  User, 
+  Mail, 
+  Phone, 
+  Building, 
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Check,
+  RefreshCw
 } from 'lucide-react';
 import heroBg from '@/assets/hero-bg.jpg';
-import { GOOGLE_SHEET_WEBAPP_URL } from '@/config/googleSheet';
+import { supabase } from '@/integrations/supabase/client';
+import type { TeamMember, TeamData } from '@/lib/teamService';
 
-// Types for team data fetched from Google Sheets
-interface TeamRecord {
+// Mapped type for display
+interface DisplayTeamData {
   teamId: string;
   teamName: string;
-  eventId: string;
   eventName: string;
-  role: 'Leader' | 'Member';
-  session: 'morning' | 'afternoon';
-}
-
-interface FetchedRegistration {
-  Name: string;
-  Email: string;
-  Phone: string;
-  College: string;
-  Department: string;
-  MorningEventID: string;
-  MorningEventName: string;
-  MorningTeamID: string;
-  MorningTeamName: string;
-  AfternoonEventID: string;
-  AfternoonEventName: string;
-  AfternoonTeamID: string;
-  AfternoonTeamName: string;
-  Role: string;
-  RegistrationType: string;
-  Timestamp: string;
+  teamSize: number;
+  leaderName: string;
+  leaderEmail: string;
+  leaderPhone: string;
+  members: TeamMember[];
+  status: 'OPEN' | 'FULL';
+  createdAt: string;
 }
 
 const TeamManagement = () => {
   const { toast } = useToast();
   const [searchEmail, setSearchEmail] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [morningTeams, setMorningTeams] = useState<TeamRecord[]>([]);
-  const [afternoonTeams, setAfternoonTeams] = useState<TeamRecord[]>([]);
+  const [myTeams, setMyTeams] = useState<DisplayTeamData[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copiedTeamId, setCopiedTeamId] = useState<string | null>(null);
 
   const handleSearch = async () => {
-    const email = searchEmail.trim().toLowerCase();
-    
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!searchEmail.trim()) {
+      toast({ title: 'Please enter your email address', variant: 'destructive' });
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(searchEmail.trim())) {
       toast({ title: 'Please enter a valid email address', variant: 'destructive' });
       return;
     }
 
     setIsSearching(true);
-    setErrorMessage(null);
-    setMorningTeams([]);
-    setAfternoonTeams([]);
-
+    
     try {
-      // Fetch from Google Sheets via GET request
-      const url = `${GOOGLE_SHEET_WEBAPP_URL}?email=${encodeURIComponent(email)}`;
+      const email = searchEmail.trim().toLowerCase();
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch team data');
+      // Find teams where user is the leader from Lovable Cloud
+      const { data: teams, error } = await supabase
+        .from('teams')
+        .select('*')
+        .ilike('leader_email', email);
+      
+      if (error) {
+        console.error('Error fetching teams:', error);
+        toast({ title: 'Failed to fetch teams', variant: 'destructive' });
+        setIsSearching(false);
+        return;
       }
 
-      const data = await response.json();
+      // Map database structure to display structure
+      const leaderTeams: DisplayTeamData[] = (teams || []).map(team => ({
+        teamId: team.team_id,
+        teamName: team.team_name,
+        eventName: team.event_name,
+        teamSize: team.team_size,
+        leaderName: team.leader_name,
+        leaderEmail: team.leader_email,
+        leaderPhone: team.leader_phone,
+        members: Array.isArray(team.members) ? (team.members as unknown as TeamMember[]) : [],
+        status: team.status as 'OPEN' | 'FULL',
+        createdAt: team.created_at,
+      }));
       
-      // Parse the response - expecting an array of registration records
-      const registrations: FetchedRegistration[] = data.registrations || data || [];
-      
-      // Process registrations to extract team info
-      const morning: TeamRecord[] = [];
-      const afternoon: TeamRecord[] = [];
-
-      registrations.forEach((reg: FetchedRegistration) => {
-        // Morning team
-        if (reg.MorningTeamID && reg.MorningTeamID.trim() !== '') {
-          morning.push({
-            teamId: reg.MorningTeamID,
-            teamName: reg.MorningTeamName || 'Unnamed Team',
-            eventId: reg.MorningEventID,
-            eventName: reg.MorningEventName || reg.MorningEventID,
-            role: reg.Role as 'Leader' | 'Member',
-            session: 'morning'
-          });
-        }
-
-        // Afternoon team
-        if (reg.AfternoonTeamID && reg.AfternoonTeamID.trim() !== '') {
-          afternoon.push({
-            teamId: reg.AfternoonTeamID,
-            teamName: reg.AfternoonTeamName || 'Unnamed Team',
-            eventId: reg.AfternoonEventID,
-            eventName: reg.AfternoonEventName || reg.AfternoonEventID,
-            role: reg.Role as 'Leader' | 'Member',
-            session: 'afternoon'
-          });
-        }
-      });
-
-      setMorningTeams(morning);
-      setAfternoonTeams(afternoon);
+      setMyTeams(leaderTeams);
       setHasSearched(true);
+      setIsSearching(false);
 
-      const total = morning.length + afternoon.length;
-      if (total === 0) {
-        toast({ title: 'No teams found', description: 'You are not part of any team yet.', variant: 'destructive' });
+      if (leaderTeams.length === 0) {
+        toast({ 
+          title: 'No teams found', 
+          description: 'You are not a leader of any team with this email.',
+          variant: 'destructive' 
+        });
       } else {
-        toast({ title: `Found ${total} team${total > 1 ? 's' : ''}` });
+        toast({ 
+          title: `Found ${leaderTeams.length} team${leaderTeams.length > 1 ? 's' : ''}`,
+          description: 'Your teams are displayed below.'
+        });
       }
     } catch (error) {
-      console.error('Error fetching team data:', error);
-      setErrorMessage('Unable to fetch team data. Please try again later.');
-      toast({ 
-        title: 'Error fetching data', 
-        description: 'Please check your connection and try again.',
-        variant: 'destructive' 
-      });
-    } finally {
+      console.error('Error searching teams:', error);
+      toast({ title: 'An error occurred while searching', variant: 'destructive' });
       setIsSearching(false);
     }
   };
 
-  const renderTeamCard = (team: TeamRecord) => {
-    const isMorning = team.session === 'morning';
-    
-    return (
-      <Card key={`${team.session}-${team.teamId}`} className="bg-card/60 backdrop-blur-sm border-border/50 overflow-hidden">
-        <div className={`${isMorning ? 'bg-primary/10' : 'bg-secondary/10'} border-b border-border/50 p-4 md:p-6`}>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              {isMorning ? (
-                <Sun className="w-6 h-6 text-primary" />
-              ) : (
-                <Sunset className="w-6 h-6 text-secondary" />
-              )}
-              <div>
-                <h2 className="font-display text-xl font-bold text-foreground">
-                  {team.teamName}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {isMorning ? 'Morning' : 'Afternoon'} Session
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge 
-                variant="outline" 
-                className={isMorning ? 'border-primary/50 text-primary' : 'border-secondary/50 text-secondary'}
-              >
-                {team.teamId}
-              </Badge>
-              <Badge className={team.role === 'Leader' ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}>
-                {team.role === 'Leader' ? (
-                  <Crown className="w-3 h-3 mr-1" />
-                ) : (
-                  <User className="w-3 h-3 mr-1" />
-                )}
-                {team.role}
-              </Badge>
-            </div>
-          </div>
-        </div>
-        <CardContent className="p-4 md:p-6">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Event:</span>
-            <span>{team.eventName}</span>
-          </div>
-        </CardContent>
-      </Card>
-    );
+  const copyTeamId = (teamId: string) => {
+    navigator.clipboard.writeText(teamId);
+    setCopiedTeamId(teamId);
+    setTimeout(() => setCopiedTeamId(null), 2000);
+    toast({ title: 'Team ID copied to clipboard!' });
+  };
+
+  const refreshTeams = () => {
+    if (searchEmail.trim()) {
+      handleSearch();
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -215,8 +167,8 @@ const TeamManagement = () => {
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground text-glow mb-3">
             Team Management
           </h1>
-          <p className="text-muted-foreground">
-            View your morning and afternoon teams
+          <p className="text-muted-foreground max-w-md mx-auto">
+            View your teams, track member registrations, and share your Team ID
           </p>
         </div>
 
@@ -230,26 +182,26 @@ const TeamManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <div className="flex-1">
+                <Label htmlFor="searchEmail" className="sr-only">Email Address</Label>
                 <Input
+                  id="searchEmail"
                   type="email"
-                  placeholder="Enter your registered email address"
+                  placeholder="Enter your email address"
                   value={searchEmail}
                   onChange={(e) => setSearchEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !isSearching && handleSearch()}
-                  className="pl-10 bg-input/50 border-border/50"
-                  disabled={isSearching}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="bg-input/50 border-border/50 focus:border-primary"
                 />
               </div>
               <Button 
-                onClick={handleSearch} 
-                disabled={isSearching} 
+                onClick={handleSearch}
+                disabled={isSearching}
                 className="gap-2"
               >
                 {isSearching ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     Searching...
                   </>
                 ) : (
@@ -260,99 +212,233 @@ const TeamManagement = () => {
                 )}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              Enter the email you used during registration to view your teams
+            <p className="text-xs text-muted-foreground mt-2">
+              Enter the email you used during registration to view teams you lead
             </p>
           </CardContent>
         </Card>
 
-        {/* Error State */}
-        {errorMessage && (
-          <Card className="bg-destructive/10 border-destructive/30 mb-8">
-            <CardContent className="py-6 text-center">
-              <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
-              <p className="text-destructive">{errorMessage}</p>
-              <Button 
-                variant="outline" 
-                onClick={handleSearch}
-                className="mt-4"
-                disabled={isSearching}
-              >
-                Try Again
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Results */}
-        {hasSearched && !errorMessage && (
+        {/* Teams List */}
+        {hasSearched && (
           <div className="space-y-6">
-            {/* Morning Teams */}
-            {morningTeams.length > 0 && (
-              <div>
-                <h2 className="font-display text-lg text-primary flex items-center gap-2 mb-4">
-                  <Sun className="w-5 h-5" />
-                  Morning Teams
-                </h2>
-                <div className="space-y-4">
-                  {morningTeams.map(team => renderTeamCard(team))}
-                </div>
+            {/* Refresh Button */}
+            {myTeams.length > 0 && (
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={refreshTeams} className="gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </Button>
               </div>
             )}
 
-            {/* Afternoon Teams */}
-            {afternoonTeams.length > 0 && (
-              <div>
-                <h2 className="font-display text-lg text-secondary flex items-center gap-2 mb-4">
-                  <Sunset className="w-5 h-5" />
-                  Afternoon Teams
-                </h2>
-                <div className="space-y-4">
-                  {afternoonTeams.map(team => renderTeamCard(team))}
-                </div>
-              </div>
-            )}
-
-            {/* No Teams Found */}
-            {morningTeams.length === 0 && afternoonTeams.length === 0 && (
+            {myTeams.length === 0 ? (
               <Card className="bg-card/60 backdrop-blur-sm border-border/50">
                 <CardContent className="py-12 text-center">
                   <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-display text-xl text-foreground mb-2">
-                    No Teams Found
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    You are not part of any team yet. Register now to join or create a team!
+                  <h3 className="font-display text-xl text-foreground mb-2">No Teams Found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    You haven't created any teams with this email address.
                   </p>
                   <Link to="/register">
-                    <Button variant="default" className="gap-2">
+                    <Button variant="hero" className="gap-2">
                       <Users className="w-4 h-4" />
-                      Register Now
+                      Create a Team
                     </Button>
                   </Link>
                 </CardContent>
               </Card>
+            ) : (
+              myTeams.map((team) => (
+                <Card 
+                  key={team.teamId} 
+                  className="bg-card/60 backdrop-blur-sm border-border/50 overflow-hidden"
+                >
+                  {/* Team Header */}
+                  <div className="bg-primary/10 border-b border-border/50 p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Crown className="w-5 h-5 text-primary" />
+                          <h2 className="font-display text-2xl font-bold text-foreground">
+                            {team.teamName}
+                          </h2>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{team.eventName}</p>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                        {/* Team ID with Copy */}
+                        <div className="flex items-center gap-2 bg-background/50 px-3 py-2 rounded-lg">
+                          <span className="text-xs text-muted-foreground">Team ID:</span>
+                          <span className="font-mono font-bold text-primary">{team.teamId}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => copyTeamId(team.teamId)}
+                            className="h-6 w-6 p-0"
+                          >
+                            {copiedTeamId === team.teamId ? (
+                              <Check className="w-3 h-3 text-primary" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </Button>
+                        </div>
+                        
+                        {/* Status Badge */}
+                        <Badge 
+                          variant={team.status === 'FULL' ? 'secondary' : 'default'}
+                          className={`${
+                            team.status === 'FULL' 
+                              ? 'bg-secondary/20 text-secondary border-secondary/30' 
+                              : 'bg-primary/20 text-primary border-primary/30'
+                          }`}
+                        >
+                          {team.status === 'FULL' ? (
+                            <>
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Full ({team.members.length + 1}/{team.teamSize})
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3 mr-1" />
+                              Open ({team.members.length + 1}/{team.teamSize})
+                            </>
+                          )}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <CardContent className="p-4 md:p-6 space-y-6">
+                    {/* Team Leader */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <Crown className="w-4 h-4 text-primary" />
+                        Team Leader (You)
+                      </h3>
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                            <Crown className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">{team.leaderName}</p>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1">
+                                <Mail className="w-3 h-3" />
+                                {team.leaderEmail}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Phone className="w-3 h-3" />
+                                {team.leaderPhone}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Team Members */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Team Members ({team.members.length})
+                      </h3>
+                      
+                      {team.members.length === 0 ? (
+                        <div className="bg-muted/20 border border-border/30 rounded-lg p-6 text-center">
+                          <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">
+                            No members have joined yet
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Share your Team ID: <span className="font-mono font-bold text-primary">{team.teamId}</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {team.members.map((member, index) => (
+                            <div 
+                              key={index} 
+                              className="bg-muted/10 border border-border/30 rounded-lg p-4"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                                  <User className="w-5 h-5 text-secondary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-foreground">{member.name}</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-2 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1 truncate">
+                                      <Mail className="w-3 h-3 flex-shrink-0" />
+                                      {member.email}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Phone className="w-3 h-3 flex-shrink-0" />
+                                      {member.phone}
+                                    </span>
+                                    <span className="flex items-center gap-1 truncate">
+                                      <Building className="w-3 h-3 flex-shrink-0" />
+                                      {member.college}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 flex-shrink-0" />
+                                      Joined {formatDate(member.joinedAt)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Team Info Footer */}
+                    <div className="pt-4 border-t border-border/30 text-xs text-muted-foreground">
+                      <p>Created on {formatDate(team.createdAt)}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             )}
           </div>
         )}
 
         {/* Initial State */}
-        {!hasSearched && !errorMessage && (
+        {!hasSearched && (
           <Card className="bg-card/40 backdrop-blur-sm border-border/30">
             <CardContent className="py-12 text-center">
               <Search className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
               <h3 className="font-display text-xl text-muted-foreground mb-2">
                 Enter Your Email to Get Started
               </h3>
-              <p className="text-sm text-muted-foreground/70">
-                Your team data is securely stored and fetched from our database
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                Use the email you registered with to view and manage your teams
               </p>
             </CardContent>
           </Card>
         )}
+
+        {/* Footer Links */}
+        <div className="mt-8 text-center space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Want to create a new team?{' '}
+            <Link to="/register" className="text-primary hover:underline">
+              Register Now
+            </Link>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            <Link to="/" className="text-primary hover:underline">
+              Back to Home
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
 };
 
 export default TeamManagement;
+

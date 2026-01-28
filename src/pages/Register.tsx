@@ -10,6 +10,16 @@ import { ArrowLeft, Sparkles, User, Users, AlertCircle, UserPlus, UsersRound, Su
 import heroBg from '@/assets/hero-bg.jpg';
 import { GOOGLE_SHEET_WEBAPP_URL } from '@/config/googleSheet';
 import HowToRegister from '@/components/HowToRegister';
+import {
+  createTeam,
+  getTeamByTeamId,
+  checkTeamNameExists,
+  joinTeam,
+  saveRegistration,
+  generateTeamId,
+  generateRegistrationId,
+  type TeamMember,
+} from '@/lib/teamService';
 
 // ============= TYPE DEFINITIONS =============
 type EventType = 'solo' | 'pair' | 'group';
@@ -77,9 +87,11 @@ interface RegistrationPayload {
   college: string;
   department: string;
   morningEventId: string;
+  morningEvent: string;
   morningEventType: EventType;
   morningTeamId: string | null;
   afternoonEventId: string;
+  afternoonEvent: string;
   afternoonTeamId: string | null;
   role: 'Leader' | 'Member';
   registrationType: 'SOLO' | 'MORNING_CREATE' | 'MORNING_JOIN' | 'AFTERNOON_CREATE' | 'AFTERNOON_JOIN';
@@ -132,37 +144,12 @@ const generateAfternoonTeamId = () => {
 };
 
 // Helper functions to get team name when joining
-const getJoinedTeamName = (teams: MorningTeamData[] | AfternoonTeamData[], teamId: string): string => {
-  const team = teams.find(t => t.teamId.toUpperCase() === teamId.toUpperCase());
-  return team?.teamName || '';
-};
+// Note: We can't synchronously get team names from cloud storage for the UI display in the same way.
+// We'll rely on the verification step in handleSubmit to ensure validity.
 
 // ============= STORAGE FUNCTIONS =============
-const getMorningTeamsFromStorage = (): MorningTeamData[] => {
-  try {
-    const data = localStorage.getItem('utsavam_morning_teams');
-    return data ? JSON.parse(data).teams : [];
-  } catch {
-    return [];
-  }
-};
+// Local storage functions removed in favor of Lovable Cloud (Supabase) integration.
 
-const saveMorningTeamsToStorage = (teams: MorningTeamData[]) => {
-  localStorage.setItem('utsavam_morning_teams', JSON.stringify({ teams }));
-};
-
-const getAfternoonTeamsFromStorage = (): AfternoonTeamData[] => {
-  try {
-    const data = localStorage.getItem('utsavam_afternoon_teams');
-    return data ? JSON.parse(data).teams : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveAfternoonTeamsToStorage = (teams: AfternoonTeamData[]) => {
-  localStorage.setItem('utsavam_afternoon_teams', JSON.stringify({ teams }));
-};
 
 // ============= MAIN COMPONENT =============
 const Register = () => {
@@ -170,19 +157,19 @@ const Register = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
-  
+
   // Team modes for morning and afternoon
   const [morningTeamMode, setMorningTeamMode] = useState<TeamMode>(null);
   const [afternoonTeamMode, setAfternoonTeamMode] = useState<TeamMode>(null);
-  
+
   // Team names for creation
   const [morningTeamName, setMorningTeamName] = useState('');
   const [afternoonTeamName, setAfternoonTeamName] = useState('');
-  
+
   // Team IDs for joining
   const [joinMorningTeamId, setJoinMorningTeamId] = useState('');
   const [joinAfternoonTeamId, setJoinAfternoonTeamId] = useState('');
-  
+
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     college: '',
@@ -235,7 +222,7 @@ const Register = () => {
 
   const isFormValid = () => {
     // Base personal details validation
-    const personalDetailsValid = 
+    const personalDetailsValid =
       formData.fullName.trim() !== '' &&
       formData.college.trim() !== '' &&
       formData.department.trim() !== '' &&
@@ -307,15 +294,7 @@ const Register = () => {
           toast({ title: 'Please enter a valid morning team name (at least 2 characters)', variant: 'destructive' });
           return false;
         }
-        const teams = getMorningTeamsFromStorage();
-        const existingTeam = teams.find(
-          t => t.teamName.toLowerCase() === morningTeamName.trim().toLowerCase() && 
-               t.eventId === selectedMorningEvent?.id
-        );
-        if (existingTeam) {
-          toast({ title: 'A morning team with this name already exists for this event', variant: 'destructive' });
-          return false;
-        }
+        // Cloud check moved to handleSubmit
       }
 
       if (morningTeamMode === 'join') {
@@ -323,32 +302,7 @@ const Register = () => {
           toast({ title: 'Please enter a Morning Team ID', variant: 'destructive' });
           return false;
         }
-        
-        const teams = getMorningTeamsFromStorage();
-        const team = teams.find(t => t.teamId.toUpperCase() === joinMorningTeamId.trim().toUpperCase());
-        
-        if (!team) {
-          toast({ title: 'Invalid Morning Team ID. Please check and try again.', variant: 'destructive' });
-          return false;
-        }
-        
-        if (team.eventId !== selectedMorningEvent?.id) {
-          const teamEvent = getEventById(team.eventId);
-          toast({ title: `This morning team is for "${teamEvent?.name}", not "${selectedMorningEvent?.name}"`, variant: 'destructive' });
-          return false;
-        }
-        
-        if (team.status === 'FULL') {
-          toast({ title: 'This morning team is already full', variant: 'destructive' });
-          return false;
-        }
-        
-        const emailExists = team.leaderEmail === formData.email.trim() || 
-          team.members.some(m => m.email === formData.email.trim());
-        if (emailExists) {
-          toast({ title: 'You are already registered in this morning team', variant: 'destructive' });
-          return false;
-        }
+        // Cloud check moved to handleSubmit
       }
     }
 
@@ -363,15 +317,7 @@ const Register = () => {
         toast({ title: 'Please enter a valid afternoon team name (at least 2 characters)', variant: 'destructive' });
         return false;
       }
-      const teams = getAfternoonTeamsFromStorage();
-      const existingTeam = teams.find(
-        t => t.teamName.toLowerCase() === afternoonTeamName.trim().toLowerCase() && 
-             t.eventId === selectedAfternoonEvent?.id
-      );
-      if (existingTeam) {
-        toast({ title: 'An afternoon team with this name already exists for this event', variant: 'destructive' });
-        return false;
-      }
+      // Cloud check moved to handleSubmit
     }
 
     if (formData.afternoonEvent && afternoonTeamMode === 'join') {
@@ -379,32 +325,7 @@ const Register = () => {
         toast({ title: 'Please enter an Afternoon Team ID', variant: 'destructive' });
         return false;
       }
-      
-      const teams = getAfternoonTeamsFromStorage();
-      const team = teams.find(t => t.teamId.toUpperCase() === joinAfternoonTeamId.trim().toUpperCase());
-      
-      if (!team) {
-        toast({ title: 'Invalid Afternoon Team ID. Please check and try again.', variant: 'destructive' });
-        return false;
-      }
-      
-      if (team.eventId !== selectedAfternoonEvent?.id) {
-        const teamEvent = getEventById(team.eventId);
-        toast({ title: `This afternoon team is for "${teamEvent?.name}", not "${selectedAfternoonEvent?.name}"`, variant: 'destructive' });
-        return false;
-      }
-      
-      if (team.status === 'FULL') {
-        toast({ title: 'This afternoon team is already full', variant: 'destructive' });
-        return false;
-      }
-      
-      const emailExists = team.leaderEmail === formData.email.trim() || 
-        team.members.some(m => m.email === formData.email.trim());
-      if (emailExists) {
-        toast({ title: 'You are already registered in this afternoon team', variant: 'destructive' });
-        return false;
-      }
+      // Cloud check moved to handleSubmit
     }
 
     return true;
@@ -413,7 +334,7 @@ const Register = () => {
   // ============= SUBMISSION HANDLER =============
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -421,141 +342,194 @@ const Register = () => {
     try {
       let morningTeamId: string | null = null;
       let afternoonTeamId: string | null = null;
+      let morningTeamDisplayName = '';
+      let afternoonTeamDisplayName = '';
       let isLeader = false;
       let registrationType: RegistrationPayload['registrationType'] = 'SOLO';
 
-      // Handle morning team creation/joining
+      // ================= MORNING TEAM LOGIC =================
       if (morningRequiresTeam && selectedMorningEvent) {
         if (morningTeamMode === 'create') {
-          registrationType = 'MORNING_CREATE';
-          morningTeamId = generateMorningTeamId();
-          isLeader = true;
+          // Check if team name already exists checks are implicit in createTeam but good to double check or handle error
+          const nameExists = await checkTeamNameExists(morningTeamName.trim(), selectedMorningEvent.name);
+          if (nameExists) {
+            toast({ title: 'A morning team with this name already exists', variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
+          }
 
-          const newTeam: MorningTeamData = {
-            teamId: morningTeamId,
-            teamName: morningTeamName.trim(),
-            eventId: selectedMorningEvent.id,
-            eventType: selectedMorningEvent.type as 'pair' | 'group',
-            requiredTeamSize: selectedMorningEvent.teamSize,
-            leaderName: formData.fullName.trim(),
-            leaderEmail: formData.email.trim(),
-            leaderPhone: formData.phone.trim(),
+          registrationType = 'MORNING_CREATE';
+          isLeader = true;
+          const generatedId = generateTeamId('Morning');
+
+          const newTeamData = {
+            team_id: generatedId,
+            team_name: morningTeamName.trim(),
+            event_type: 'Morning' as const,
+            event_name: selectedMorningEvent.name,
+            team_size: selectedMorningEvent.teamSize,
+            leader_name: formData.fullName.trim(),
+            leader_email: formData.email.trim(),
+            leader_phone: formData.phone.trim(),
+            leader_college: formData.college.trim(),
+            leader_department: formData.department.trim(),
             members: [],
-            status: 'OPEN',
-            createdAt: new Date().toISOString()
+            status: 'OPEN' as const,
           };
 
-          const teams = getMorningTeamsFromStorage();
-          teams.push(newTeam);
-          saveMorningTeamsToStorage(teams);
+          const createResult = await createTeam(newTeamData);
+          if (!createResult.success) {
+            toast({ title: createResult.error || 'Failed to create morning team', variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
+          }
+          morningTeamId = generatedId;
+          morningTeamDisplayName = morningTeamName.trim();
+
         } else if (morningTeamMode === 'join') {
           registrationType = 'MORNING_JOIN';
-          const teams = getMorningTeamsFromStorage();
-          const teamIndex = teams.findIndex(t => t.teamId.toUpperCase() === joinMorningTeamId.trim().toUpperCase());
-          
-          if (teamIndex !== -1) {
-            const team = teams[teamIndex];
-            morningTeamId = team.teamId;
 
-            const newMember: TeamMember = {
-              name: formData.fullName.trim(),
-              email: formData.email.trim(),
-              phone: formData.phone.trim(),
-              college: formData.college.trim(),
-              department: formData.department.trim(),
-              joinedAt: new Date().toISOString()
-            };
+          const newMember: TeamMember = {
+            name: formData.fullName.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            college: formData.college.trim(),
+            department: formData.department.trim(),
+            joinedAt: new Date().toISOString()
+          };
 
-            team.members.push(newMember);
-            
-            // Check if team is now full (leader + members = teamSize)
-            if (team.members.length + 1 >= team.requiredTeamSize) {
-              team.status = 'FULL';
-            }
+          const joinResult = await joinTeam(joinMorningTeamId.trim(), newMember);
 
-            teams[teamIndex] = team;
-            saveMorningTeamsToStorage(teams);
+          if (!joinResult.success || !joinResult.team) {
+            toast({ title: joinResult.error || 'Failed to join morning team', variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
           }
+
+          // Verify event match (double check)
+          if (joinResult.team.event_name !== selectedMorningEvent.name) {
+            toast({ title: `This team is for "${joinResult.team.event_name}", not "${selectedMorningEvent.name}"`, variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
+          }
+
+          morningTeamId = joinResult.team.team_id;
+          morningTeamDisplayName = joinResult.team.team_name;
         }
       }
 
-      // Handle afternoon team creation/joining (only if afternoon event selected)
+      // ================= AFTERNOON TEAM LOGIC =================
       if (formData.afternoonEvent && selectedAfternoonEvent) {
         if (afternoonTeamMode === 'create') {
           if (!morningRequiresTeam || morningTeamMode !== 'create') {
             registrationType = 'AFTERNOON_CREATE';
           }
-          afternoonTeamId = generateAfternoonTeamId();
           if (!isLeader) isLeader = true;
 
-          const newTeam: AfternoonTeamData = {
-            teamId: afternoonTeamId,
-            teamName: afternoonTeamName.trim(),
-            eventId: selectedAfternoonEvent.id,
-            requiredTeamSize: selectedAfternoonEvent.teamSize,
-            leaderName: formData.fullName.trim(),
-            leaderEmail: formData.email.trim(),
-            leaderPhone: formData.phone.trim(),
+          // Check unique name
+          const nameExists = await checkTeamNameExists(afternoonTeamName.trim(), selectedAfternoonEvent.name);
+          if (nameExists) {
+            toast({ title: 'An afternoon team with this name already exists', variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
+          }
+
+          const generatedId = generateTeamId('Afternoon');
+          const newTeamData = {
+            team_id: generatedId,
+            team_name: afternoonTeamName.trim(),
+            event_type: 'Afternoon' as const,
+            event_name: selectedAfternoonEvent.name,
+            team_size: selectedAfternoonEvent.teamSize,
+            leader_name: formData.fullName.trim(),
+            leader_email: formData.email.trim(),
+            leader_phone: formData.phone.trim(),
+            leader_college: formData.college.trim(),
+            leader_department: formData.department.trim(),
             members: [],
-            status: 'OPEN',
-            createdAt: new Date().toISOString()
+            status: 'OPEN' as const,
           };
 
-          const teams = getAfternoonTeamsFromStorage();
-          teams.push(newTeam);
-          saveAfternoonTeamsToStorage(teams);
+          const createResult = await createTeam(newTeamData);
+          if (!createResult.success) {
+            toast({ title: createResult.error || 'Failed to create afternoon team', variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
+          }
+          afternoonTeamId = generatedId;
+          afternoonTeamDisplayName = afternoonTeamName.trim();
+
         } else if (afternoonTeamMode === 'join') {
           if (!morningRequiresTeam && registrationType === 'SOLO') {
             registrationType = 'AFTERNOON_JOIN';
           }
-          const teams = getAfternoonTeamsFromStorage();
-          const teamIndex = teams.findIndex(t => t.teamId.toUpperCase() === joinAfternoonTeamId.trim().toUpperCase());
-          
-          if (teamIndex !== -1) {
-            const team = teams[teamIndex];
-            afternoonTeamId = team.teamId;
 
-            const newMember: TeamMember = {
-              name: formData.fullName.trim(),
-              email: formData.email.trim(),
-              phone: formData.phone.trim(),
-              college: formData.college.trim(),
-              department: formData.department.trim(),
-              joinedAt: new Date().toISOString()
-            };
+          const newMember: TeamMember = {
+            name: formData.fullName.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            college: formData.college.trim(),
+            department: formData.department.trim(),
+            joinedAt: new Date().toISOString()
+          };
 
-            team.members.push(newMember);
-            
-            if (team.members.length + 1 >= team.requiredTeamSize) {
-              team.status = 'FULL';
-            }
-
-            teams[teamIndex] = team;
-            saveAfternoonTeamsToStorage(teams);
+          const joinResult = await joinTeam(joinAfternoonTeamId.trim(), newMember);
+          if (!joinResult.success || !joinResult.team) {
+            toast({ title: joinResult.error || 'Failed to join afternoon team', variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
           }
+
+          if (joinResult.team.event_name !== selectedAfternoonEvent.name) {
+            toast({ title: `This team is for "${joinResult.team.event_name}", not "${selectedAfternoonEvent.name}"`, variant: 'destructive' });
+            setIsSubmitting(false);
+            return;
+          }
+
+          afternoonTeamId = joinResult.team.team_id;
+          afternoonTeamDisplayName = joinResult.team.team_name;
         }
       }
 
-      // Create registration payload for internal use
-      // Safe access - use empty strings/defaults when events are not selected
-      const registration: RegistrationPayload = {
-        registrationId: generateId(),
-        name: formData.fullName.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
+      // ================= FINAL REGISTRATION SAVE =================
+
+      // ================= FINAL REGISTRATION SAVE =================
+
+      // Map internal registration type to Database Allowed Values
+      // DB allows: 'SOLO', 'CREATE_TEAM', 'JOIN_TEAM'
+      let dbRegistrationType: 'SOLO' | 'CREATE_TEAM' | 'JOIN_TEAM' = 'SOLO';
+
+      if (registrationType.includes('CREATE')) {
+        dbRegistrationType = 'CREATE_TEAM';
+      } else if (registrationType.includes('JOIN')) {
+        dbRegistrationType = 'JOIN_TEAM';
+      }
+
+      // Save to Supabase (Lovable Cloud)
+      const registrationData = {
+        registration_id: generateRegistrationId(),
+        full_name: formData.fullName.trim(),
         college: formData.college.trim(),
         department: formData.department.trim(),
-        morningEventId: selectedMorningEvent ? selectedMorningEvent.id : '',
-        morningEventType: selectedMorningEvent ? selectedMorningEvent.type : 'solo',
-        morningTeamId: morningTeamId,
-        afternoonEventId: selectedAfternoonEvent ? selectedAfternoonEvent.id : '',
-        afternoonTeamId: afternoonTeamId,
-        role: isLeader ? 'Leader' : 'Member',
-        registrationType: registrationType,
-        timestamp: new Date().toISOString()
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+        morning_event: selectedMorningEvent ? selectedMorningEvent.name : '',
+        afternoon_event: selectedAfternoonEvent ? selectedAfternoonEvent.name : '',
+        registration_type: dbRegistrationType,
+        team_id: morningTeamId || afternoonTeamId || undefined, // Primary team ID focus
+        team_name: morningTeamDisplayName || afternoonTeamDisplayName || undefined,
+        is_team_leader: isLeader
       };
 
-      // Build Google Sheets payload with safe optional chaining - never crashes on undefined
+      const saveResult = await saveRegistration(registrationData);
+
+      if (!saveResult.success) {
+        toast({ title: 'Final registration failed. Please try again.', variant: 'destructive' });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Also send to Google Sheets as legacy/backup support
       const sheetPayload = {
         Name: formData.fullName.trim(),
         Email: formData.email.trim(),
@@ -566,47 +540,62 @@ const Register = () => {
         MorningEventName: selectedMorningEvent?.name || "",
         MorningEventType: selectedMorningEvent?.type || "",
         MorningTeamID: morningTeamId || "",
-        MorningTeamName: morningTeamMode === 'create' ? morningTeamName.trim() : 
-                         (morningTeamMode === 'join' ? getJoinedTeamName(getMorningTeamsFromStorage(), joinMorningTeamId.trim()) : ''),
+        MorningTeamName: morningTeamDisplayName,
         AfternoonEventID: selectedAfternoonEvent?.id || "",
         AfternoonEventName: selectedAfternoonEvent?.name || "",
         AfternoonTeamID: afternoonTeamId || "",
-        AfternoonTeamName: afternoonTeamMode === 'create' ? afternoonTeamName.trim() : 
-                           (afternoonTeamMode === 'join' ? getJoinedTeamName(getAfternoonTeamsFromStorage(), joinAfternoonTeamId.trim()) : ''),
+        AfternoonTeamName: afternoonTeamDisplayName,
         Role: isLeader ? "Leader" : "Member",
         RegistrationType: registrationType
       };
 
       // Submit to Google Sheets using no-cors mode (CORS-safe, no response parsing)
-      await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+      fetch(GOOGLE_SHEET_WEBAPP_URL, {
         method: "POST",
         mode: "no-cors",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sheetPayload)
-      });
+      }).catch(err => console.error('Sheet logging failed', err));
 
-      // Store in localStorage as backup
+      // Construct local object for success page compatibility
+      // We still use localStorage for "my registration" memory (backup)
+      const registration: RegistrationPayload = {
+        registrationId: registrationData.registration_id,
+        name: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        college: formData.college.trim(),
+        department: formData.department.trim(),
+        morningEventId: selectedMorningEvent ? selectedMorningEvent.id : '',
+        morningEvent: selectedMorningEvent ? selectedMorningEvent.name : '',
+        morningEventType: selectedMorningEvent ? selectedMorningEvent.type : 'solo',
+        morningTeamId: morningTeamId,
+        afternoonEventId: selectedAfternoonEvent ? selectedAfternoonEvent.id : '',
+        afternoonEvent: selectedAfternoonEvent ? selectedAfternoonEvent.name : '',
+        afternoonTeamId: afternoonTeamId,
+        role: isLeader ? 'Leader' : 'Member',
+        registrationType: registrationType,
+        timestamp: new Date().toISOString()
+      };
+
       const existingData = localStorage.getItem('utsavam_registrations');
       const registrations = existingData ? JSON.parse(existingData) : { registrations: [] };
       registrations.registrations.push(registration);
       localStorage.setItem('utsavam_registrations', JSON.stringify(registrations));
 
-      // Always navigate to success (Google Sheets failure must not block user)
-      navigate('/registration-success', { 
-        state: { 
+      // Always navigate to success
+      navigate('/registration-success', {
+        state: {
           registration,
           generatedMorningTeamId: morningTeamMode === 'create' ? morningTeamId : undefined,
           generatedAfternoonTeamId: afternoonTeamMode === 'create' ? afternoonTeamId : undefined,
           morningEventName: selectedMorningEvent?.name,
           afternoonEventName: selectedAfternoonEvent?.name
-        } 
+        }
       });
     } catch (error) {
       console.error('Registration error:', error);
-      // Still navigate to success - don't block user due to network issues
-      navigate('/registration-success');
+      toast({ title: 'An unexpected error occurred', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -634,7 +623,7 @@ const Register = () => {
   return (
     <div className="relative min-h-screen">
       {/* Background */}
-      <div 
+      <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
@@ -644,8 +633,8 @@ const Register = () => {
 
       <div className="relative z-10 px-4 py-8 md:py-12 max-w-2xl mx-auto">
         {/* Back Button */}
-        <Link 
-          to="/" 
+        <Link
+          to="/"
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -668,440 +657,428 @@ const Register = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Personal Details Card */}
-          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-            <CardHeader className="pb-4">
-              <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
-                <User className="w-5 h-5 text-primary" />
-                Personal Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  placeholder="Enter your full name"
-                  value={formData.fullName}
-                  onChange={(e) => handleInputChange('fullName', e.target.value)}
-                  className="bg-input/50 border-border/50 focus:border-primary"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="college">College Name</Label>
-                <Input
-                  id="college"
-                  placeholder="Enter your college name"
-                  value={formData.college}
-                  onChange={(e) => handleInputChange('college', e.target.value)}
-                  className="bg-input/50 border-border/50 focus:border-primary"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="department">Department / Year</Label>
-                <Input
-                  id="department"
-                  placeholder="e.g., CSE / 3rd Year"
-                  value={formData.department}
-                  onChange={(e) => handleInputChange('department', e.target.value)}
-                  className="bg-input/50 border-border/50 focus:border-primary"
-                />
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="10-digit number"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    className="bg-input/50 border-border/50 focus:border-primary"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email ID</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="bg-input/50 border-border/50 focus:border-primary"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Morning Events Card */}
-          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-            <CardHeader className="pb-4">
-              <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
-                <Sun className="w-5 h-5 text-primary" />
-                Morning Event
-                <span className="text-sm font-normal text-muted-foreground ml-2">(Choose 1)</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={formData.morningEvent}
-                onValueChange={(value) => handleInputChange('morningEvent', value)}
-                className="space-y-3"
-              >
-                {MORNING_EVENTS.map((event) => (
-                  <div 
-                    key={event.id}
-                    className={`flex items-center space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${
-                      formData.morningEvent === event.id 
-                        ? 'border-primary bg-primary/10' 
-                        : 'border-border/50 hover:border-primary/50'
-                    }`}
-                    onClick={() => handleInputChange('morningEvent', event.id)}
-                  >
-                    <RadioGroupItem value={event.id} id={event.id} />
-                    <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
-                      {event.name}
-                    </Label>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {getEventBadge(event)}
-                    </span>
-                    {getEventIcon(event)}
+              {/* Personal Details Card */}
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    Personal Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      placeholder="Enter your full name"
+                      value={formData.fullName}
+                      onChange={(e) => handleInputChange('fullName', e.target.value)}
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                    />
                   </div>
-                ))}
-              </RadioGroup>
-              {selectedMorningEvent && (
-                <p className={`mt-3 text-sm flex items-center gap-2 ${morningRequiresTeam ? 'text-secondary' : 'text-muted-foreground'}`}>
-                  <AlertCircle className="w-4 h-4" />
-                  {getEventTypeLabel(selectedMorningEvent)}
-                </p>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Morning Team Registration Card */}
-          {morningRequiresTeam && selectedMorningEvent && (
-            <Card className="bg-card/60 backdrop-blur-sm border-primary/30 animate-fade-in">
-              <CardHeader className="pb-4">
-                <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
-                  <Sun className="w-5 h-5 text-primary" />
-                  Morning Team
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    (For {selectedMorningEvent.name})
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-primary/10 p-3 rounded-lg text-sm text-primary border border-primary/20">
-                  <p className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    {getEventTypeLabel(selectedMorningEvent)} – Morning Team IDs start with "M-"
-                  </p>
-                </div>
-
-                <RadioGroup
-                  value={morningTeamMode || ''}
-                  onValueChange={(value) => setMorningTeamMode(value as TeamMode)}
-                  className="grid sm:grid-cols-2 gap-3"
-                >
-                  <div 
-                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${
-                      morningTeamMode === 'create' 
-                        ? 'border-primary bg-primary/10' 
-                        : 'border-border/50 hover:border-primary/50'
-                    }`}
-                    onClick={() => setMorningTeamMode('create')}
-                  >
-                    <RadioGroupItem value="create" id="create-morning-team" />
-                    <div className="flex-1">
-                      <Label htmlFor="create-morning-team" className="cursor-pointer font-medium flex items-center gap-2">
-                        <UserPlus className="w-4 h-4" />
-                        Create Morning Team
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">Start a new team as leader</p>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="college">College Name</Label>
+                    <Input
+                      id="college"
+                      placeholder="Enter your college name"
+                      value={formData.college}
+                      onChange={(e) => handleInputChange('college', e.target.value)}
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                    />
                   </div>
-                  
-                  <div 
-                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${
-                      morningTeamMode === 'join' 
-                        ? 'border-primary bg-primary/10' 
-                        : 'border-border/50 hover:border-primary/50'
-                    }`}
-                    onClick={() => setMorningTeamMode('join')}
-                  >
-                    <RadioGroupItem value="join" id="join-morning-team" />
-                    <div className="flex-1">
-                      <Label htmlFor="join-morning-team" className="cursor-pointer font-medium flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        Join Morning Team
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">Join using Team ID</p>
-                    </div>
-                  </div>
-                </RadioGroup>
 
-                {morningTeamMode === 'create' && (
-                  <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department / Year</Label>
+                    <Input
+                      id="department"
+                      placeholder="e.g., CSE / 3rd Year"
+                      value={formData.department}
+                      onChange={(e) => handleInputChange('department', e.target.value)}
+                      className="bg-input/50 border-border/50 focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="morningTeamName">Morning Team Name</Label>
+                      <Label htmlFor="phone">Phone Number</Label>
                       <Input
-                        id="morningTeamName"
-                        placeholder="Enter a unique team name"
-                        value={morningTeamName}
-                        onChange={(e) => setMorningTeamName(e.target.value)}
+                        id="phone"
+                        type="tel"
+                        placeholder="10-digit number"
+                        value={formData.phone}
+                        onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
                         className="bg-input/50 border-border/50 focus:border-primary"
-                        maxLength={30}
                       />
                     </div>
-                    <div className="bg-muted/20 p-3 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Team Size:</span>
-                        <span className="text-sm font-medium text-foreground">
-                          {selectedMorningEvent.teamSize} members (fixed)
-                        </span>
-                      </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email ID</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        className="bg-input/50 border-border/50 focus:border-primary"
+                      />
                     </div>
-                    <div className="bg-muted/20 p-3 rounded-lg text-sm text-muted-foreground">
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Morning Events Card */}
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                    <Sun className="w-5 h-5 text-primary" />
+                    Morning Event
+                    <span className="text-sm font-normal text-muted-foreground ml-2">(Choose 1)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={formData.morningEvent}
+                    onValueChange={(value) => handleInputChange('morningEvent', value)}
+                    className="space-y-3"
+                  >
+                    {MORNING_EVENTS.map((event) => (
+                      <div
+                        key={event.id}
+                        className={`flex items-center space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${formData.morningEvent === event.id
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border/50 hover:border-primary/50'
+                          }`}
+                      >
+                        <RadioGroupItem value={event.id} id={event.id} />
+                        <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
+                          {event.name}
+                        </Label>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {getEventBadge(event)}
+                        </span>
+                        {getEventIcon(event)}
+                      </div>
+                    ))}
+                  </RadioGroup>
+                  {selectedMorningEvent && (
+                    <p className={`mt-3 text-sm flex items-center gap-2 ${morningRequiresTeam ? 'text-secondary' : 'text-muted-foreground'}`}>
+                      <AlertCircle className="w-4 h-4" />
+                      {getEventTypeLabel(selectedMorningEvent)}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Morning Team Registration Card */}
+              {morningRequiresTeam && selectedMorningEvent && (
+                <Card className="bg-card/60 backdrop-blur-sm border-primary/30 animate-fade-in">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                      <Sun className="w-5 h-5 text-primary" />
+                      Morning Team
+                      <span className="text-sm font-normal text-muted-foreground ml-2">
+                        (For {selectedMorningEvent.name})
+                      </span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-primary/10 p-3 rounded-lg text-sm text-primary border border-primary/20">
                       <p className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-primary" />
-                        A Morning Team ID (M-XXXX) will be generated. Share it with your teammates.
+                        <AlertCircle className="w-4 h-4" />
+                        {getEventTypeLabel(selectedMorningEvent)} – Morning Team IDs start with "M-"
                       </p>
                     </div>
-                  </div>
-                )}
 
-                {morningTeamMode === 'join' && (
-                  <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
-                    <div className="space-y-2">
-                      <Label htmlFor="joinMorningTeamId">Morning Team ID</Label>
-                      <Input
-                        id="joinMorningTeamId"
-                        placeholder="e.g., M-A1B2"
-                        value={joinMorningTeamId}
-                        onChange={(e) => setJoinMorningTeamId(e.target.value.toUpperCase())}
-                        className="bg-input/50 border-border/50 focus:border-primary uppercase"
-                        maxLength={6}
-                      />
-                      <p className="text-xs text-muted-foreground">Get this ID from your morning team leader</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                    <RadioGroup
+                      value={morningTeamMode || ''}
+                      onValueChange={(value) => setMorningTeamMode(value as TeamMode)}
+                      className="grid sm:grid-cols-2 gap-3"
+                    >
+                      <div
+                        className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${morningTeamMode === 'create'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border/50 hover:border-primary/50'
+                          }`}
+                      >
+                        <RadioGroupItem value="create" id="create-morning-team" />
+                        <div className="flex-1">
+                          <Label htmlFor="create-morning-team" className="cursor-pointer font-medium flex items-center gap-2">
+                            <UserPlus className="w-4 h-4" />
+                            Create Morning Team
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">Start a new team as leader</p>
+                        </div>
+                      </div>
 
-          {/* Afternoon Events Card */}
-          <Card className="bg-card/60 backdrop-blur-sm border-border/50">
-            <CardHeader className="pb-4">
-              <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
-                <Sunset className="w-5 h-5 text-secondary" />
-                Afternoon Event
-                <span className="text-sm font-normal text-muted-foreground ml-2">(Choose 1)</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={formData.afternoonEvent}
-                onValueChange={(value) => handleInputChange('afternoonEvent', value)}
-                className="space-y-3"
-              >
-                {AFTERNOON_EVENTS.map((event) => (
-                  <div 
-                    key={event.id}
-                    className={`flex items-center space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${
-                      formData.afternoonEvent === event.id 
-                        ? 'border-secondary bg-secondary/10' 
-                        : 'border-border/50 hover:border-secondary/50'
-                    }`}
-                    onClick={() => handleInputChange('afternoonEvent', event.id)}
-                  >
-                    <RadioGroupItem value={event.id} id={event.id} />
-                    <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
-                      {event.name}
-                    </Label>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {getEventBadge(event)}
-                    </span>
-                    {getEventIcon(event)}
-                  </div>
-                ))}
-              </RadioGroup>
-              {selectedAfternoonEvent && (
-                <p className="mt-3 text-sm text-secondary flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {getEventTypeLabel(selectedAfternoonEvent)} – Team registration required
-                </p>
+                      <div
+                        className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${morningTeamMode === 'join'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border/50 hover:border-primary/50'
+                          }`}
+                      >
+                        <RadioGroupItem value="join" id="join-morning-team" />
+                        <div className="flex-1">
+                          <Label htmlFor="join-morning-team" className="cursor-pointer font-medium flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Join Morning Team
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">Join using Team ID</p>
+                        </div>
+                      </div>
+                    </RadioGroup>
+
+                    {morningTeamMode === 'create' && (
+                      <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
+                        <div className="space-y-2">
+                          <Label htmlFor="morningTeamName">Morning Team Name</Label>
+                          <Input
+                            id="morningTeamName"
+                            placeholder="Enter a unique team name"
+                            value={morningTeamName}
+                            onChange={(e) => setMorningTeamName(e.target.value)}
+                            className="bg-input/50 border-border/50 focus:border-primary"
+                            maxLength={30}
+                          />
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Team Size:</span>
+                            <span className="text-sm font-medium text-foreground">
+                              {selectedMorningEvent.teamSize} members (fixed)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg text-sm text-muted-foreground">
+                          <p className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-primary" />
+                            A Morning Team ID (M-XXXX) will be generated. Share it with your teammates.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {morningTeamMode === 'join' && (
+                      <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
+                        <div className="space-y-2">
+                          <Label htmlFor="joinMorningTeamId">Morning Team ID</Label>
+                          <Input
+                            id="joinMorningTeamId"
+                            placeholder="e.g., M-A1B2"
+                            value={joinMorningTeamId}
+                            onChange={(e) => setJoinMorningTeamId(e.target.value.toUpperCase())}
+                            className="bg-input/50 border-border/50 focus:border-primary uppercase"
+                            maxLength={6}
+                          />
+                          <p className="text-xs text-muted-foreground">Get this ID from your morning team leader</p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
 
-          {/* Afternoon Team Registration Card */}
-          {selectedAfternoonEvent && (
-            <Card className="bg-card/60 backdrop-blur-sm border-secondary/30 animate-fade-in">
-              <CardHeader className="pb-4">
-                <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
-                  <Sunset className="w-5 h-5 text-secondary" />
-                  Afternoon Team
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    (For {selectedAfternoonEvent.name})
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-secondary/10 p-3 rounded-lg text-sm text-secondary border border-secondary/20">
-                  <p className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    {getEventTypeLabel(selectedAfternoonEvent)} – Afternoon Team IDs start with "A-"
-                  </p>
-                </div>
-
-                <RadioGroup
-                  value={afternoonTeamMode || ''}
-                  onValueChange={(value) => setAfternoonTeamMode(value as TeamMode)}
-                  className="grid sm:grid-cols-2 gap-3"
-                >
-                  <div 
-                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${
-                      afternoonTeamMode === 'create' 
-                        ? 'border-secondary bg-secondary/10' 
-                        : 'border-border/50 hover:border-secondary/50'
-                    }`}
-                    onClick={() => setAfternoonTeamMode('create')}
+              {/* Afternoon Events Card */}
+              <Card className="bg-card/60 backdrop-blur-sm border-border/50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                    <Sunset className="w-5 h-5 text-secondary" />
+                    Afternoon Event
+                    <span className="text-sm font-normal text-muted-foreground ml-2">(Choose 1)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup
+                    value={formData.afternoonEvent}
+                    onValueChange={(value) => handleInputChange('afternoonEvent', value)}
+                    className="space-y-3"
                   >
-                    <RadioGroupItem value="create" id="create-afternoon-team" />
-                    <div className="flex-1">
-                      <Label htmlFor="create-afternoon-team" className="cursor-pointer font-medium flex items-center gap-2">
-                        <UserPlus className="w-4 h-4" />
-                        Create Afternoon Team
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">Start a new team as leader</p>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${
-                      afternoonTeamMode === 'join' 
-                        ? 'border-secondary bg-secondary/10' 
-                        : 'border-border/50 hover:border-secondary/50'
-                    }`}
-                    onClick={() => setAfternoonTeamMode('join')}
-                  >
-                    <RadioGroupItem value="join" id="join-afternoon-team" />
-                    <div className="flex-1">
-                      <Label htmlFor="join-afternoon-team" className="cursor-pointer font-medium flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        Join Afternoon Team
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-1">Join using Team ID</p>
-                    </div>
-                  </div>
-                </RadioGroup>
-
-                {afternoonTeamMode === 'create' && (
-                  <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
-                    <div className="space-y-2">
-                      <Label htmlFor="afternoonTeamName">Afternoon Team Name</Label>
-                      <Input
-                        id="afternoonTeamName"
-                        placeholder="Enter a unique team name"
-                        value={afternoonTeamName}
-                        onChange={(e) => setAfternoonTeamName(e.target.value)}
-                        className="bg-input/50 border-border/50 focus:border-secondary"
-                        maxLength={30}
-                      />
-                    </div>
-                    <div className="bg-muted/20 p-3 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Team Size:</span>
-                        <span className="text-sm font-medium text-foreground">
-                          {selectedAfternoonEvent.teamSize} members (fixed)
+                    {AFTERNOON_EVENTS.map((event) => (
+                      <div
+                        key={event.id}
+                        className={`flex items-center space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${formData.afternoonEvent === event.id
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-border/50 hover:border-secondary/50'
+                          }`}
+                      >
+                        <RadioGroupItem value={event.id} id={event.id} />
+                        <Label htmlFor={event.id} className="flex-1 cursor-pointer font-medium">
+                          {event.name}
+                        </Label>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {getEventBadge(event)}
                         </span>
+                        {getEventIcon(event)}
                       </div>
-                    </div>
-                    <div className="bg-muted/20 p-3 rounded-lg text-sm text-muted-foreground">
+                    ))}
+                  </RadioGroup>
+                  {selectedAfternoonEvent && (
+                    <p className="mt-3 text-sm text-secondary flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {getEventTypeLabel(selectedAfternoonEvent)} – Team registration required
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Afternoon Team Registration Card */}
+              {selectedAfternoonEvent && (
+                <Card className="bg-card/60 backdrop-blur-sm border-secondary/30 animate-fade-in">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="font-display text-xl text-foreground flex items-center gap-2">
+                      <Sunset className="w-5 h-5 text-secondary" />
+                      Afternoon Team
+                      <span className="text-sm font-normal text-muted-foreground ml-2">
+                        (For {selectedAfternoonEvent.name})
+                      </span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-secondary/10 p-3 rounded-lg text-sm text-secondary border border-secondary/20">
                       <p className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-secondary" />
-                        An Afternoon Team ID (A-XXXX) will be generated. Share it with your teammates.
+                        <AlertCircle className="w-4 h-4" />
+                        {getEventTypeLabel(selectedAfternoonEvent)} – Afternoon Team IDs start with "A-"
                       </p>
                     </div>
-                  </div>
+
+                    <RadioGroup
+                      value={afternoonTeamMode || ''}
+                      onValueChange={(value) => setAfternoonTeamMode(value as TeamMode)}
+                      className="grid sm:grid-cols-2 gap-3"
+                    >
+                      <div
+                        className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${afternoonTeamMode === 'create'
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-border/50 hover:border-secondary/50'
+                          }`}
+                      >
+                        <RadioGroupItem value="create" id="create-afternoon-team" />
+                        <div className="flex-1">
+                          <Label htmlFor="create-afternoon-team" className="cursor-pointer font-medium flex items-center gap-2">
+                            <UserPlus className="w-4 h-4" />
+                            Create Afternoon Team
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">Start a new team as leader</p>
+                        </div>
+                      </div>
+
+                      <div
+                        className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${afternoonTeamMode === 'join'
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-border/50 hover:border-secondary/50'
+                          }`}
+                      >
+                        <RadioGroupItem value="join" id="join-afternoon-team" />
+                        <div className="flex-1">
+                          <Label htmlFor="join-afternoon-team" className="cursor-pointer font-medium flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Join Afternoon Team
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">Join using Team ID</p>
+                        </div>
+                      </div>
+                    </RadioGroup>
+
+                    {afternoonTeamMode === 'create' && (
+                      <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
+                        <div className="space-y-2">
+                          <Label htmlFor="afternoonTeamName">Afternoon Team Name</Label>
+                          <Input
+                            id="afternoonTeamName"
+                            placeholder="Enter a unique team name"
+                            value={afternoonTeamName}
+                            onChange={(e) => setAfternoonTeamName(e.target.value)}
+                            className="bg-input/50 border-border/50 focus:border-secondary"
+                            maxLength={30}
+                          />
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Team Size:</span>
+                            <span className="text-sm font-medium text-foreground">
+                              {selectedAfternoonEvent.teamSize} members (fixed)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-muted/20 p-3 rounded-lg text-sm text-muted-foreground">
+                          <p className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-secondary" />
+                            An Afternoon Team ID (A-XXXX) will be generated. Share it with your teammates.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {afternoonTeamMode === 'join' && (
+                      <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
+                        <div className="space-y-2">
+                          <Label htmlFor="joinAfternoonTeamId">Afternoon Team ID</Label>
+                          <Input
+                            id="joinAfternoonTeamId"
+                            placeholder="e.g., A-X1Y2"
+                            value={joinAfternoonTeamId}
+                            onChange={(e) => setJoinAfternoonTeamId(e.target.value.toUpperCase())}
+                            className="bg-input/50 border-border/50 focus:border-secondary uppercase"
+                            maxLength={6}
+                          />
+                          <p className="text-xs text-muted-foreground">Get this ID from your afternoon team leader</p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Validation Messages */}
+              {(showMorningEventMessage || showAfternoonEventMessage) && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-primary" />
+                  <span>Please select 1 morning event and 1 afternoon event to continue.</span>
+                </div>
+              )}
+
+              {showMorningTeamMessage && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-primary" />
+                  <span>Please select "Create Morning Team" or "Join Morning Team" for your morning event.</span>
+                </div>
+              )}
+
+              {showAfternoonTeamMessage && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-secondary" />
+                  <span>Please select "Create Afternoon Team" or "Join Afternoon Team" for your afternoon event.</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                variant="hero"
+                size="xl"
+                className="w-full group"
+                disabled={!isFormValid() || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                    Registering...
+                  </span>
+                ) : (
+                  <>
+                    <span>Complete Registration</span>
+                    <Sparkles className="w-5 h-5 transition-transform group-hover:rotate-12" />
+                  </>
                 )}
+              </Button>
 
-                {afternoonTeamMode === 'join' && (
-                  <div className="space-y-4 pt-4 border-t border-border/30 animate-fade-in">
-                    <div className="space-y-2">
-                      <Label htmlFor="joinAfternoonTeamId">Afternoon Team ID</Label>
-                      <Input
-                        id="joinAfternoonTeamId"
-                        placeholder="e.g., A-X1Y2"
-                        value={joinAfternoonTeamId}
-                        onChange={(e) => setJoinAfternoonTeamId(e.target.value.toUpperCase())}
-                        className="bg-input/50 border-border/50 focus:border-secondary uppercase"
-                        maxLength={6}
-                      />
-                      <p className="text-xs text-muted-foreground">Get this ID from your afternoon team leader</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Validation Messages */}
-          {(showMorningEventMessage || showAfternoonEventMessage) && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-primary" />
-              <span>Please select 1 morning event and 1 afternoon event to continue.</span>
-            </div>
-          )}
-
-          {showMorningTeamMessage && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-primary" />
-              <span>Please select "Create Morning Team" or "Join Morning Team" for your morning event.</span>
-            </div>
-          )}
-
-          {showAfternoonTeamMessage && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-secondary" />
-              <span>Please select "Create Afternoon Team" or "Join Afternoon Team" for your afternoon event.</span>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <Button 
-            type="submit" 
-            variant="hero" 
-            size="xl" 
-            className="w-full group"
-            disabled={!isFormValid() || isSubmitting}
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                Registering...
-              </span>
-            ) : (
-              <>
-                <span>Complete Registration</span>
-                <Sparkles className="w-5 h-5 transition-transform group-hover:rotate-12" />
-              </>
-            )}
-          </Button>
-
-          {/* Event Details Link */}
-          <p className="text-center text-sm text-muted-foreground">
-            Not sure which events to choose?{' '}
-            <Link to="/events" className="text-primary hover:underline">
-              Explore all events
-            </Link>
-          </p>
+              {/* Event Details Link */}
+              <p className="text-center text-sm text-muted-foreground">
+                Not sure which events to choose?{' '}
+                <Link to="/events" className="text-primary hover:underline">
+                  Explore all events
+                </Link>
+              </p>
             </form>
           </>
         )}
